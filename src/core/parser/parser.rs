@@ -1084,3 +1084,168 @@ impl Parser {
         Ok(Expr::Map(fields, span))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse_source(source: &str) -> Result<Program, ParseError> {
+        let mut lexer = crate::core::lexer::Lexer::new(source);
+        let (tokens, lex_errors) = lexer.tokenize();
+        if !lex_errors.is_empty() {
+            return Err(ParseError::Fatal(format!("Lexer errors: {:?}", lex_errors)));
+        }
+        let mut parser = Parser::new(tokens);
+        parser.parse()
+    }
+
+    #[test]
+    fn test_parse_simple_integer() {
+        let source = "42";
+        let result = parse_source(source);
+        assert!(result.is_ok());
+        let program = result.unwrap();
+        assert_eq!(program.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_simple_string() {
+        let source = r#""hello world""#;
+        let result = parse_source(source);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parse_let_statement() {
+        let source = "let x: int = 42";
+        let result = parse_source(source);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parse_binary_expression() {
+        let source = "1 + 2";
+        let result = parse_source(source);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parse_nested_binary_expression() {
+        let source = "1 + 2 * 3";
+        let result = parse_source(source);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parse_function_call() {
+        let source = "print(42)";
+        let result = parse_source(source);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parse_list_literal() {
+        let source = "[1, 2, 3]";
+        let result = parse_source(source);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parse_map_literal() {
+        let source = r#"{"key": "value"}"#;
+        let result = parse_source(source);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parse_field_access() {
+        let source = "point.x";
+        let result = parse_source(source);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parse_index_access() {
+        let source = "arr[0]";
+        let result = parse_source(source);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parse_chinese_let_statement() {
+        let source = "let x = 25";
+        let result = parse_source(source);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parse_if_statement() {
+        let source = "if x > 0 { return 1 }";
+        let result = parse_source(source);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parse_while_statement() {
+        let source = "while x < 10 { x = x + 1 }";
+        let result = parse_source(source);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parse_repeat_statement() {
+        let source = "repeat 5 { x = x + 1 }";
+        let result = parse_source(source);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parse_return_statement() {
+        let source = "return 42";
+        let result = parse_source(source);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parse_assignment() {
+        let source = "x = 42";
+        let result = parse_source(source);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parse_function_definition() {
+        let source = "function add(a: int, b: int) -> int { return a + b }";
+        let result = parse_source(source);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parse_comparison_operators() {
+        let sources = [
+            "x > 0",
+            "x < 0",
+            "x >= 0",
+            "x <= 0",
+            "x == 0",
+            "x != 0",
+        ];
+        for source in sources {
+            let result = parse_source(source);
+            assert!(result.is_ok(), "Failed to parse: {}", source);
+        }
+    }
+
+    #[test]
+    fn test_parse_logical_operators() {
+        let sources = [
+            "x && y",
+            "x || y",
+            "!x",
+        ];
+        for source in sources {
+            let result = parse_source(source);
+            assert!(result.is_ok(), "Failed to parse: {}", source);
+        }
+    }
+}

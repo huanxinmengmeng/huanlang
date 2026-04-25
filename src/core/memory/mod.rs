@@ -8,6 +8,7 @@ pub mod list;
 pub mod map;
 pub mod string;
 pub mod rc;
+pub mod weak;
 
 pub use allocator::{Allocator, GlobalAllocator, FirstFitAllocator, default_allocator};
 pub use borrow::{BorrowChecker, BorrowError, LoanState, VarId};
@@ -16,3 +17,4 @@ pub use list::HuanList;
 pub use map::{HuanMap, MapEntry};
 pub use string::HuanString;
 pub use rc::Rc;
+pub use weak::Weak;

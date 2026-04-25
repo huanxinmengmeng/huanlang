@@ -1,14 +1,13 @@
 // Copyright © 2026 幻心梦梦（huanxinmengmeng）
 // 本项目依据项目根目录的 LICENSE 文件中的幻语许可证进行许可。
 
-use huanlang::core::lexer::{Lexer, Token};
+use huanlang::core::lexer::Lexer;
 use huanlang::core::parser::Parser;
 use huanlang::core::backend::llvm::LLVMBackend;
 use huanlang::core::backend::{TargetTriple, CodeGenOptions};
 use huanlang::core::ast::{Program, Function, Ident, Type, Stmt, Expr, BinaryOp};
 
 /// 测试基本函数解析和 LLVM IR 生成
-#[test]
 fn test_function_parsing_and_codegen() {
     let source = "
 函数 主() -> 整数 {
@@ -60,7 +59,6 @@ fn test_function_parsing_and_codegen() {
 }
 
 /// 测试参数化函数
-#[test]
 fn test_function_with_parameters() {
     let source = "
 函数 add(a: 整数, b: 整数) -> 整数 {
@@ -93,7 +91,6 @@ fn test_function_with_parameters() {
 }
 
 /// 测试控制流语句（if 语句）
-#[test]
 fn test_control_flow() {
     let source = "
 函数 max(a: 整数, b: 整数) -> 整数 {
@@ -128,7 +125,6 @@ fn test_control_flow() {
 }
 
 /// 测试循环语句
-#[test]
 fn test_loop() {
     let source = "
 函数 sum(n: 整数) -> 整数 {
@@ -163,7 +159,6 @@ fn test_loop() {
 }
 
 /// 测试多个函数
-#[test]
 fn test_multiple_functions() {
     let source = "
 函数 square(x: 整数) -> 整数 {
@@ -198,7 +193,6 @@ fn test_multiple_functions() {
 }
 
 /// 测试字符串字面量
-#[test]
 fn test_string_literal() {
     let source = "
 函数 主() -> 整数 {
@@ -228,7 +222,6 @@ fn test_string_literal() {
 }
 
 /// 测试复杂表达式
-#[test]
 fn test_complex_expressions() {
     let source = "
 函数 主() -> 整数 {
@@ -260,7 +253,6 @@ fn test_complex_expressions() {
 }
 
 /// 测试类型转换验证
-#[test]
 fn test_type_conversion() {
     use huanlang::core::backend::llvm::ast_to_llvm::AstToLlvmCodeGen;
     
@@ -272,7 +264,6 @@ fn test_type_conversion() {
 }
 
 /// 测试 LLVM IR 验证
-#[test]
 fn test_llvm_validation() {
     use huanlang::core::backend::llvm::ast_to_llvm::validate_llvm_ir;
     

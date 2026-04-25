@@ -1061,4 +1061,127 @@ mod tests {
         let new_err = err.with_span(new_span);
         assert!(matches!(new_err, TypeError::UnboundVariable { .. }));
     }
+
+    #[test]
+    fn test_type_infer_new() {
+        let symbol_table = SymbolTable::new();
+        let type_infer = TypeInfer::new(symbol_table);
+        assert_eq!(type_infer.next_var, 0);
+        assert!(type_infer.env.len() == 1);
+    }
+
+    #[test]
+    fn test_fresh_type_var() {
+        let symbol_table = SymbolTable::new();
+        let mut type_infer = TypeInfer::new(symbol_table);
+        let var1 = type_infer.fresh_var();
+        let var2 = type_infer.fresh_var();
+        assert_ne!(var1, var2);
+    }
+
+    #[test]
+    fn test_type_unification_int() {
+        let symbol_table = SymbolTable::new();
+        let mut type_infer = TypeInfer::new(symbol_table);
+        let result = type_infer.unify(Type::Int, Type::Int);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_type_unification_fail() {
+        let symbol_table = SymbolTable::new();
+        let mut type_infer = TypeInfer::new(symbol_table);
+        let result = type_infer.unify(Type::Int, Type::String);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_type_to_string() {
+        assert_eq!(format!("{:?}", Type::Int), "Int");
+        assert_eq!(format!("{:?}", Type::String), "String");
+        assert_eq!(format!("{:?}", Type::Bool), "Bool");
+        assert_eq!(format!("{:?}", Type::Unit), "Unit");
+    }
+
+    #[test]
+    fn test_type_is_numeric() {
+        assert!(Type::Int.is_numeric());
+        assert!(Type::F64.is_numeric());
+        assert!(!Type::String.is_numeric());
+        assert!(!Type::Bool.is_numeric());
+    }
+
+    #[test]
+    fn test_type_is_integer() {
+        assert!(Type::Int.is_integer());
+        assert!(Type::I64.is_integer());
+        assert!(!Type::F64.is_integer());
+    }
+
+    #[test]
+    fn test_symbol_creation() {
+        let symbol = Symbol {
+            name: "test".to_string(),
+            kind: SymbolKind::Variable,
+            ty: Type::Int,
+            mutable: true,
+            visibility: Visibility::Public,
+            span: SourceSpan::dummy(),
+            scope_depth: 0,
+        };
+        assert_eq!(symbol.name, "test");
+        assert!(symbol.mutable);
+    }
+
+    #[test]
+    fn test_scope_node_variants() {
+        assert!(matches!(ScopeNode::Module, ScopeNode::Module));
+        assert!(matches!(ScopeNode::Function, ScopeNode::Function));
+        assert!(matches!(ScopeNode::Block, ScopeNode::Block));
+    }
+
+    #[test]
+    fn test_visibility_variants() {
+        assert!(matches!(Visibility::Private, Visibility::Private));
+        assert!(matches!(Visibility::Public, Visibility::Public));
+    }
+
+    #[test]
+    fn test_symbol_kind_variants() {
+        assert!(matches!(SymbolKind::Variable, SymbolKind::Variable));
+        assert!(matches!(SymbolKind::Function, SymbolKind::Function));
+        assert!(matches!(SymbolKind::Struct, SymbolKind::Struct));
+    }
+
+    #[test]
+    fn test_type_list() {
+        let list_type = Type::List(Box::new(Type::Int));
+        assert!(format!("{:?}", list_type).contains("List"));
+    }
+
+    #[test]
+    fn test_type_option() {
+        let option_type = Type::Option(Box::new(Type::String));
+        assert!(format!("{:?}", option_type).contains("Option"));
+    }
+
+    #[test]
+    fn test_type_map() {
+        let map_type = Type::Map(Box::new(Type::String), Box::new(Type::Int));
+        assert!(format!("{:?}", map_type).contains("Map"));
+    }
+
+    #[test]
+    fn test_type_func() {
+        let func_type = Type::Func(vec![Type::Int, Type::Int], Box::new(Type::Int));
+        assert!(format!("{:?}", func_type).contains("Func"));
+    }
+
+    #[test]
+    fn test_infer_program_empty() {
+        let symbol_table = SymbolTable::new();
+        let mut type_infer = TypeInfer::new(symbol_table);
+        let result = type_infer.infer_program(&vec![]);
+        assert!(result.is_ok());
+    }
 }
