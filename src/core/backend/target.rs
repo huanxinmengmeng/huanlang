@@ -55,6 +55,35 @@ impl TargetTriple {
     pub fn wasm32_unknown_unknown() -> Self {
         Self("wasm32-unknown-unknown".into())
     }
+
+    /// 嵌入式目标
+    pub fn thumbv7m_none_eabi() -> Self {
+        Self("thumbv7m-none-eabi".into()) // Cortex-M3
+    }
+
+    pub fn thumbv7em_none_eabihf() -> Self {
+        Self("thumbv7em-none-eabihf".into()) // Cortex-M4 (硬浮点)
+    }
+
+    pub fn thumbv6m_none_eabi() -> Self {
+        Self("thumbv6m-none-eabi".into()) // Cortex-M0
+    }
+
+    pub fn riscv32imac_unknown_none_elf() -> Self {
+        Self("riscv32imac-unknown-none-elf".into()) // RISC-V 32
+    }
+
+    pub fn riscv64gc_unknown_none_elf() -> Self {
+        Self("riscv64gc-unknown-none-elf".into()) // RISC-V 64
+    }
+
+    pub fn avr_unknown_none() -> Self {
+        Self("avr-unknown-none".into()) // AVR
+    }
+
+    pub fn xtensa_esp32_none_elf() -> Self {
+        Self("xtensa-esp32-none-elf".into()) // ESP32
+    }
 }
 
 impl fmt::Display for TargetTriple {

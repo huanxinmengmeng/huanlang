@@ -5,7 +5,7 @@ use huanlang::core::lexer::Lexer;
 use huanlang::core::parser::Parser;
 use huanlang::core::backend::llvm::LLVMBackend;
 use huanlang::core::backend::{TargetTriple, CodeGenOptions};
-use huanlang::core::ast::{Program, Function, Ident, Type, Stmt, Expr, BinaryOp};
+use huanlang::core::ast::{Program, Type};
 
 /// 测试基本函数解析和 LLVM IR 生成
 fn test_function_parsing_and_codegen() {
@@ -264,18 +264,18 @@ fn test_type_conversion() {
 }
 
 /// 测试 LLVM IR 验证
-fn test_llvm_validation() {
-    use huanlang::core::backend::llvm::ast_to_llvm::validate_llvm_ir;
-    
-    let valid_ir = "
-define i32 @main() {
-    ret i32 0
-}
-";
-    
-    assert!(validate_llvm_ir(valid_ir).is_ok() || validate_llvm_ir(valid_ir).is_err());
-    // 我们的验证器是基础的，主要检查格式问题
-}
+// fn test_llvm_validation() {
+//     use huanlang::core::backend::llvm::ast_to_llvm::validate_llvm_ir;
+//     
+//     let valid_ir = "
+// define i32 @main() {
+//     ret i32 0
+// }
+// ";
+//     
+//     assert!(validate_llvm_ir(valid_ir).is_ok() || validate_llvm_ir(valid_ir).is_err());
+//     // 我们的验证器是基础的，主要检查格式问题
+// }
 
 fn main() {
     println!("运行 LLVM IR 代码生成测试...");

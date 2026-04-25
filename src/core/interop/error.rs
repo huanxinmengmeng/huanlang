@@ -49,6 +49,12 @@ impl fmt::Display for TranspileError {
     }
 }
 
+impl From<std::io::Error> for TranspileError {
+    fn from(error: std::io::Error) -> Self {
+        TranspileError::IOError(PathBuf::new(), error.to_string())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum BindGenError {
     NoExportedItems,

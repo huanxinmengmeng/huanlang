@@ -2,9 +2,8 @@
 // 本项目依据项目根目录的 LICENSE 文件中的幻语许可证进行许可。
 
 use huanlang::core::ast::*;
-use huanlang::core::lexer::token::{SourceSpan, SourcePosition};
-use huanlang::core::backend::llvm::LLVMBackend;
-use huanlang::core::backend::{TargetTriple, CodeGenOptions};
+use huanlang::core::lexer::token::SourceSpan;
+use huanlang::core::backend::{TargetTriple};
 use huanlang::core::backend::llvm::ast_to_llvm::AstToLlvmCodeGen;
 
 fn main() {

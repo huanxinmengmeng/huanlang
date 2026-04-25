@@ -25,7 +25,7 @@
 
 幻语（HuanLang）是一款现代化的编程语言，支持**中文**、**拼音**和**英文**三种关键词体系。开发者可以根据自己的习惯自由选择关键词语言，极大降低了学习曲线，同时为国际化协作和 AI 代码生成提供了灵活性。
 
-**版本**: 0.0.1
+**版本**: 0.1.0
 **发布日期**: 2026年4月
 
 ### 核心特性
@@ -44,7 +44,7 @@
 | 属性 | 值 |
 |------|-----|
 | 语言名称 | 幻语（HuanLang） |
-| 版本 | 0.0.1 |
+| 版本 | 0.1.0 |
 | 文件扩展名 | `.hl`（源代码）、`.hla`（AI交换格式）、`.hlm`（模块接口）、`.hlp`（包文件）、`.hasm`（独立汇编） |
 | MIME 类型 | `text/x-huan` |
 | 编码 | UTF-8 无 BOM |
@@ -151,17 +151,49 @@ huan check example.hl
 # 格式化代码
 huan fmt example.hl
 
-# 词法分析
-huan lex example.hl
+# 编辑文件
+huan edit example.hl
 
-# 语法分析
-huan parse example.hl
+# 启动 REPL
+huan repl
 
 # 显示版本
 huan version
 
-# 显示帮助
-huan help
+# 跨语言转换
+huan transpile example.hl --to rust -o example.rs
+```
+
+### 构建命令编译选项
+
+```bash
+# 优化级别
+huan build example.hl -O 0          # 无优化，调试用
+huan build example.hl -O 2          # 标准优化（默认）
+huan build example.hl -O 3          # 激进优化
+huan build example.hl -O s          # 尺寸优化
+
+# 查看中间产物
+huan build example.hl --emit llvm-ir -o example.ll   # 输出 LLVM IR
+huan build example.hl --emit asm -o example.s        # 输出汇编代码
+
+# 生成调试信息
+huan build example.hl --debug
+
+# 启用所有权检查
+huan build example.hl --ownership
+
+# 链接时优化
+huan build example.hl --release --lto
+
+# 剥离符号
+huan build example.hl --strip
+
+# 目标平台
+huan build example.hl --target wasm32-unknown-unknown
+
+# 输出文件
+huan build example.hl -o myprogram
 ```
 
 ### 语法示例
@@ -351,7 +383,7 @@ huanlang/
 
 **《幻语编程语言 - 完整详细的开发规范文档》**是幻语编程语言的官方实现指南，专为编译器开发者和工具链开发者设计。
 
-- **版本**：0.0.1
+- **版本**：0.1.0
 - **更新日期**：2026年4月
 - **适用对象**：编译器开发者、工具链开发者
 - **文档位置**：`docs/开发规范文档/`
@@ -492,7 +524,7 @@ s.替换("l", "L")   // -> "HeLLo"
 
 ## 更新日志
 
-### v0.0.1 (2026年4月)
+### v0.1.0 (2026年4月)
 
 - 初始正式发布版本
 - 实现完整的三语关键词系统（中文、拼音、英文）
@@ -561,7 +593,7 @@ s.替换("l", "L")   // -> "HeLLo"
 
 | 版本 | 发布日期 | 主要变更 |
 |------|---------|---------|
-| 0.0.1 | 2026年4月 | 首个公开版本，核心语言设计规范完成，编译器架构定义，标准库API草案，示例代码集 |
+| 0.1.0 | 2026年4月 | 首个公开版本，核心语言设计规范完成，编译器架构定义，标准库API草案，示例代码集 |
 
 详细的版本发布说明请查看仓库中的 `CHANGELOG.md` 文件。
 

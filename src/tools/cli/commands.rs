@@ -21,6 +21,13 @@ pub struct BuildCommand {
     pub input: String,
     pub output: Option<String>,
     pub opt_level: OptLevel,
+    pub debug: bool,
+    pub ownership: bool,
+    pub lto: bool,
+    pub release: bool,
+    pub strip: bool,
+    pub target: Option<String>,
+    pub emit: Option<String>,
 }
 
 /// 运行命令
@@ -56,6 +63,13 @@ impl BuildCommand {
             input,
             output: None,
             opt_level: OptLevel::Default,
+            debug: false,
+            ownership: false,
+            lto: false,
+            release: false,
+            strip: false,
+            target: None,
+            emit: None,
         }
     }
 }
@@ -147,11 +161,24 @@ pub fn execute_build(cmd: BuildCommand) -> CliResult<()> {
                 base_output.clone()
             };
 
-            println!("优化级别: {:?}", cmd.opt_level);
-            eprintln!("DEBUG: AST has {} items", ast.len());
-            for (i, item) in ast.iter().enumerate() {
-                eprintln!("DEBUG: AST item {}: {:?}", i, item);
-            }
+            // 处理编译选项
+    println!("优化级别: {:?}", cmd.opt_level);
+    println!("调试信息: {:?}", cmd.debug);
+    println!("所有权检查: {:?}", cmd.ownership);
+    println!("链接时优化: {:?}", cmd.lto);
+    println!("发布模式: {:?}", cmd.release);
+    println!("剥离符号: {:?}", cmd.strip);
+    if let Some(target) = &cmd.target {
+        println!("目标平台: {}", target);
+    }
+    if let Some(emit) = &cmd.emit {
+        println!("输出格式: {}", emit);
+    }
+    
+    eprintln!("DEBUG: AST has {} items", ast.len());
+    for (i, item) in ast.iter().enumerate() {
+        eprintln!("DEBUG: AST item {}: {:?}", i, item);
+    }
 
             // 步骤1: AST 到 MLIR 转换
             let mut converter = crate::core::mlir::conversion::AstToMlirConverter::new();
@@ -276,9 +303,20 @@ pub fn execute_run(cmd: RunCommand) -> CliResult<()> {
 
     let mut parser = Parser::new(tokens);
     match parser.parse() {
-        Ok(_ast) => {
+        Ok(ast) => {
             println!("语法分析完成");
-            println!("程序执行完成");
+            
+            // 使用解释器执行代码
+            let mut interpreter = crate::interpreter::Interpreter::new();
+            match interpreter.run_program(&ast) {
+                Ok(result) => {
+                    println!("执行结果: {:?}", result);
+                    println!("程序执行完成");
+                }
+                Err(e) => {
+                    println!("执行错误: {}", e);
+                }
+            }
         }
         Err(e) => {
             println!("语法错误:");
@@ -496,33 +534,9 @@ pub fn execute_edit(cmd: EditCommand) -> CliResult<()> {
 
 /// 执行 REPL
 pub fn execute_repl() -> CliResult<()> {
-    use rustyline::{Editor, history::FileHistory};
-
     println!("幻语 REPL - 交互式编程环境");
     println!("输入代码并按回车执行，输入 :quit 退出");
     println!("输入 :help 获取帮助");
-    println!("使用上下箭头键查看历史命令");
-
-    // 创建编辑器 - 使用 FileHistory 代替 MemHistory 以支持历史记录持久化
-    let mut rl = match Editor::<(), FileHistory>::new() {
-        Ok(editor) => editor,
-        Err(e) => {
-            println!("错误: 无法创建编辑器: {}", e);
-            return Ok(());
-        }
-    };
-
-    // 历史记录使用默认设置
-
-    // 加载历史文件（如果存在）
-    let history_path = dirs::home_dir().map(|path| path.join(".huan_history"));
-    if let Some(path) = &history_path {
-        if path.exists() {
-            if let Err(e) = rl.load_history(path) {
-                eprintln!("警告: 无法加载历史记录: {}", e);
-            }
-        }
-    }
 
     let mut multi_line_input = String::new();
     let mut open_braces = 0usize;
@@ -536,10 +550,14 @@ pub fn execute_repl() -> CliResult<()> {
             "... "
         };
 
-        let readline = rl.readline(prompt);
-        match readline {
-            Ok(line) => {
-                if line.trim().is_empty() {
+        print!("{}", prompt);
+        io::stdout().flush().ok();
+
+        let mut line = String::new();
+        match io::stdin().read_line(&mut line) {
+            Ok(_) => {
+                let line = line.trim_end();
+                if line.is_empty() {
                     continue;
                 }
 
@@ -552,8 +570,6 @@ pub fn execute_repl() -> CliResult<()> {
                     println!("  :quit, :q   - 退出 REPL");
                     println!("  :help, :h   - 显示帮助信息");
                     println!("  :clear, :c  - 清屏");
-                    println!("  :ast        - 显示上一个输入的 AST");
-                    println!("  :tokens     - 显示上一个输入的 Token 列表");
                     continue;
                 }
 
@@ -579,8 +595,7 @@ pub fn execute_repl() -> CliResult<()> {
 
                 if open_braces == 0 && open_parens == 0 && open_brackets == 0 {
                     // 多行输入结束
-                    let full_code = multi_line_input.clone();
-                    let _ = rl.add_history_entry(&full_code);
+                    let full_code = multi_line_input.clone() + line;
 
                     // 执行代码
                     let mut lexer = Lexer::new(&full_code);
@@ -595,7 +610,18 @@ pub fn execute_repl() -> CliResult<()> {
                         let mut parser = Parser::new(tokens);
                         match parser.parse() {
                             Ok(ast) => {
-                                println!("语法分析完成: {:?}", ast);
+                                println!("语法分析完成");
+                                
+                                // 使用解释器执行代码
+                                let mut interpreter = crate::interpreter::Interpreter::new();
+                                match interpreter.run_program(&ast) {
+                                    Ok(result) => {
+                                        println!("执行结果: {:?}", result);
+                                    }
+                                    Err(e) => {
+                                        println!("执行错误: {}", e);
+                                    }
+                                }
                             }
                             Err(e) => {
                                 println!("语法错误: {:?}", e);
@@ -609,33 +635,14 @@ pub fn execute_repl() -> CliResult<()> {
                     open_brackets = 0;
                 } else {
                     // 多行输入继续
-                    multi_line_input.push_str(&line);
+                    multi_line_input.push_str(line);
                     multi_line_input.push('\n');
-                    let _ = rl.add_history_entry(&line);
                 }
             }
-            Err(rustyline::error::ReadlineError::Interrupted) => {
-                println!("^C");
-                multi_line_input.clear();
-                open_braces = 0;
-                open_parens = 0;
-                open_brackets = 0;
-            }
-            Err(rustyline::error::ReadlineError::Eof) => {
-                println!("再见!");
+            Err(e) => {
+                eprintln!("错误: {:?}", e);
                 break;
             }
-            Err(err) => {
-                eprintln!("错误: {:?}", err);
-                break;
-            }
-        }
-    }
-
-    // 保存历史文件
-    if let Some(path) = &history_path {
-        if let Err(e) = rl.save_history(path) {
-            eprintln!("警告: 无法保存历史记录: {}", e);
         }
     }
 
@@ -668,14 +675,55 @@ impl Cli {
         match args[1].as_str() {
             "build" => {
                 let mut cmd = BuildCommand::new(String::new());
-                for i in 2..args.len() {
+                let mut i = 2;
+                while i < args.len() {
                     if args[i].starts_with('-') {
-                        if args[i] == "-o" && i + 1 < args.len() {
-                            cmd.output = Some(args[i + 1].clone());
+                        match args[i].as_str() {
+                            "-o" | "--output" if i + 1 < args.len() => {
+                                cmd.output = Some(args[i + 1].clone());
+                                i += 1;
+                            }
+                            "-O" | "--optimize" if i + 1 < args.len() => {
+                                match args[i + 1].as_str() {
+                                    "0" => cmd.opt_level = OptLevel::None,
+                                    "1" => cmd.opt_level = OptLevel::Less,
+                                    "2" => cmd.opt_level = OptLevel::Default,
+                                    "3" => cmd.opt_level = OptLevel::Aggressive,
+                                    "s" | "z" => cmd.opt_level = OptLevel::Size,
+                                    _ => {}
+                                }
+                                i += 1;
+                            }
+                            "--debug" => {
+                                cmd.debug = true;
+                            }
+                            "--ownership" => {
+                                cmd.ownership = true;
+                            }
+                            "--lto" => {
+                                cmd.lto = true;
+                            }
+                            "--release" => {
+                                cmd.release = true;
+                                cmd.opt_level = OptLevel::Aggressive;
+                            }
+                            "--strip" => {
+                                cmd.strip = true;
+                            }
+                            "--target" if i + 1 < args.len() => {
+                                cmd.target = Some(args[i + 1].clone());
+                                i += 1;
+                            }
+                            "--emit" if i + 1 < args.len() => {
+                                cmd.emit = Some(args[i + 1].clone());
+                                i += 1;
+                            }
+                            _ => {}
                         }
                     } else if cmd.input.is_empty() {
                         cmd.input = args[i].clone();
                     }
+                    i += 1;
                 }
                 if let Err(e) = execute_build(cmd) {
                     eprintln!("错误: {}", e);

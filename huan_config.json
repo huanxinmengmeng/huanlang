@@ -1,0 +1,14 @@
+{
+  "build": {
+    "optimize": "debug",
+    "target": "native",
+    "features": []
+  },
+  "run": {
+    "args": [],
+    "env": {
+      "DEBUG": "false",
+      "LOG_LEVEL": "info"
+    }
+  }
+}

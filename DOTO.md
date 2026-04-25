@@ -1,495 +1,578 @@
-# Trae 继续开发幻语指南
+# 幻语从源码构建、编译到运行的完整方案
 
-基于对 [Gitee 仓库](https://gitee.com/huanxinmengmeng/huanlang) 当前状态的分析，以下是供 Trae 使用的完整开发参考。
+## 一、概览
 
+幻语编译工具链本身是用 Rust 编写的，最终用户的 `.hl` 源码经由工具链编译为原生可执行文件。整个流程分为两大步骤：
 
-## 一、关键文件路径速查
+1. **构建幻语编译器本身**：从 Gitee 仓库拉取源码，编译生成 `huan` 命令行工具。
+2. **使用幻语编译器编译运行用户程序**：用 `huan` 命令将 `.hl` 源码编译为目标平台的可执行文件或固件。
 
-以下是开发过程中最常用的文件入口：
 
-```
-huanlang/
-├── README.md                              # 项目概述、三语关键词表、许可证
-├── LICENSE                                 # 幻语许可证（中英双语）
-├── Cargo.toml                              # Rust 项目配置、依赖声明
-├── src/
-│   ├── main.rs                             # CLI 入口（已实现）
-│   ├── lexer/
-│   │   ├── mod.rs                          # 词法分析器模块入口
-│   │   └── chinese_lexer.rs               # 中文词法分析器实现（约291行）
-│   ├── parser/
-│   │   ├── mod.rs                          # 语法解析器入口（仅声明模块）
-│   │   └── ast.rs                          # AST 节点定义（待填充）
-│   ├── sema/
-│   │   └── mod.rs                          # 语义分析入口（仅声明模块）
-│   ├── typeck/
-│   │   └── mod.rs                          # 类型检查入口（仅声明模块）
-│   ├── codegen/
-│   │   └── mod.rs                          # 代码生成入口（仅声明模块）
-│   ├── editor/
-│   │   └── mod.rs                          # 内置编辑器入口（仅声明模块）
-│   └── lsp/
-│       └── mod.rs                          # LSP 服务器入口（仅声明模块）
-├── stdlib/
-│   └── .keep                               # 标准库（空，待填充 .hl 源文件）
-├── docs/
-│   └── ...                                 # 22 部分设计规范文档
-├── examples/
-│   └── .keep                               # 示例程序（待填充）
-└── tests/
-    └── .keep                               # 测试用例（待填充）
-```
+## 二、环境准备
 
+### 2.1 基础依赖
 
-## 二、当前开发基线（v0.0.1）
+| 依赖 | 最低版本 | 说明 |
+|------|---------|------|
+| Rust 工具链 | 1.75+ | 编译器本体及 Cargo 包管理器 |
+| LLVM | 18.0+ | 后端代码生成（含 `llvm-config`） |
+| MLIR | 18.0+ | 中间表示优化框架（通常随 LLVM 发行） |
+| CMake | 3.20+ | MLIR C++ 组件的构建系统 |
+| Ninja | 1.10+ | 构建加速（可选，推荐） |
+| Git | 2.0+ | 版本控制 |
 
-截至 v0.0.1，仓库中已完成的工作与待完成的工作如下。
-
-**已完成 ✅**：
-
-| 模块 | 内容 | 状态 |
-|------|------|------|
-| 语言设计规范 | 22 部分完整文档，涵盖语法、类型系统、并发、汇编、跨语言互操作等 | ✅ 完成 |
-| 词法分析器 | 约 291 行 Rust 代码，支持 CJK 字符识别、三语关键词映射、错误恢复 | ✅ 完成 |
-| AST 定义 | 完整的 AST 节点定义，包含表达式、语句、类型、模式匹配、内联汇编等 | ✅ 完成 |
-| 语法解析器 | 完整的递归下降解析器，支持所有语法结构，Pratt 解析处理运算符优先级 | ✅ 完成 |
-| 语义分析 | 符号表管理、类型推断、Hindley-Milner 类型推导、作用域管理 | ✅ 完成 |
-| LLVM 代码生成 | MLIR 中间表示、AST 到 LLVM IR 转换、代码优化通道 | ✅ 完成 |
-| 标准库 | IO、集合、字符串、数学、加密、网络、时间、序列化、系统等模块 | ✅ 完成 |
-| 测试框架 | 完整的单元测试、集成测试、基准测试框架 | ✅ 完成 |
-| CLI 工具 | build、run、check、fmt 等命令，完整的前端工具链 | ✅ 完成 |
-| 内置编辑器 | 基于 TUI 的文本编辑器，支持语法高亮、LSP 集成 | ✅ 部分完成 |
-| LSP 服务器 | 语言服务器协议实现，代码补全、跳转、诊断等功能 | ✅ 部分完成 |
-| 项目配置 | `Cargo.toml` 含依赖声明 | ✅ 完成 |
-| 许可证 | `LICENSE` 文件已就绪 | ✅ 完成 |
-
-**待完成 ❌（按优先级排序）**：
-
-| 优先级 | 模块 | 当前状态 | 预估工作量 |
-|--------|------|---------|-----------|
-| P0 | 包管理器 | 设计文档完整，代码部分实现 | 500+ 行 |
-| P1 | 性能优化 | JIT 编译、垃圾回收、并行优化 | 1000+ 行 |
-| P2 | 嵌入式支持 |裸机编程、实时操作系统支持 | 1500+ 行 |
-| P3 | WebAssembly | WASM 目标支持、Web 平台集成 | 1000+ 行 |
-
-
-## 三、最小可行编译器链路
-
-v0.0.1 → v0.1.0 的目标是打通**最基本的编译链路**：源代码 → 词法分析 → 语法分析 → 语义分析 → LLVM 代码生成 → 可执行文件。以下是分步骤实现指南。
-
-### 步骤一：填充 AST 定义
-
-**目标文件**：`src/parser/ast.rs`
-
-**需要定义的节点类型**：
-
-```rust
-// 基础节点
-pub struct Span { pub start: usize, pub end: usize, pub line: usize, pub column: usize }
-pub struct Ident { pub name: String, pub span: Span }
-pub struct Path { pub segments: Vec<Ident>, pub span: Span }
-
-// 类型节点
-pub enum Type {
-    Int, I8, I16, I32, I64, U8, U16, U32, U64, F32, F64,
-    Bool, Char, String, Unit,
-    List(Box<Type>), Ptr(Box<Type>), Option(Box<Type>),
-    Named(Path),
-}
-
-// 表达式节点（最简子集）
-pub enum Expr {
-    IntLit(i64, Span),
-    FloatLit(f64, Span),
-    StringLit(String, Span),
-    BoolLit(bool, Span),
-    Ident(Ident),
-    BinaryOp { op: BinaryOp, left: Box<Expr>, right: Box<Expr>, span: Span },
-    UnaryOp { op: UnaryOp, expr: Box<Expr>, span: Span },
-    Call { func: Box<Expr>, args: Vec<Expr>, span: Span },
-}
-
-pub enum BinaryOp { Add, Sub, Mul, Div, Eq, Ne, Gt, Lt, Ge, Le, And, Or }
-pub enum UnaryOp { Not, Neg }
-
-// 语句节点
-pub enum Stmt {
-    Let { name: Ident, ty: Option<Type>, value: Box<Expr>, span: Span },
-    If { cond: Box<Expr>, then_block: Vec<Stmt>, else_block: Option<Vec<Stmt>>, span: Span },
-    While { cond: Box<Expr>, body: Vec<Stmt>, span: Span },
-    Return(Option<Box<Expr>>, Span),
-    Expr(Box<Expr>, Span),
-}
-
-// 顶层项
-pub enum Item {
-    Function(Function),
-    Global(Global),
-}
-
-pub struct Function {
-    pub name: Ident,
-    pub params: Vec<(Ident, Type)>,
-    pub return_type: Type,
-    pub body: Vec<Stmt>,
-    pub span: Span,
-}
-
-pub struct Global {
-    pub mutable: bool,
-    pub name: Ident,
-    pub ty: Option<Type>,
-    pub value: Box<Expr>,
-    pub span: Span,
-}
-
-pub type Program = Vec<Item>;
-```
-
-> **提示**：完整的 AST 定义参考设计文档第 5 部分，上述为 v0.1.0 最简可编译子集。后续可逐步扩展支持结构体、特征、模式匹配等高级特性。
-
-### 步骤二：实现语法解析器
-
-**目标文件**：`src/parser/mod.rs`
-
-**核心架构**：采用**递归下降 + Pratt 解析器**，处理表达式优先级。
-
-**解析器结构体**：
-
-```rust
-pub struct Parser {
-    tokens: Vec<Token>,
-    pos: usize,
-    errors: Vec<ParseError>,
-}
-
-impl Parser {
-    pub fn new(tokens: Vec<Token>) -> Self;
-    pub fn parse(&mut self) -> Result<Program, ParseError>;
-    
-    // 顶层解析
-    fn parse_item(&mut self) -> Result<Item, ParseError>;
-    fn parse_function(&mut self) -> Result<Function, ParseError>;
-    
-    // 语句解析
-    fn parse_stmt(&mut self) -> Result<Stmt, ParseError>;
-    fn parse_let(&mut self) -> Result<Stmt, ParseError>;
-    fn parse_if(&mut self) -> Result<Stmt, ParseError>;
-    fn parse_while(&mut self) -> Result<Stmt, ParseError>;
-    fn parse_return(&mut self) -> Result<Stmt, ParseError>;
-    
-    // 表达式解析（Pratt）
-    fn parse_expr(&mut self) -> Result<Expr, ParseError>;
-    fn parse_expr_with_precedence(&mut self, min_prec: u8) -> Result<Expr, ParseError>;
-    fn parse_prefix(&mut self) -> Result<Expr, ParseError>;
-    fn parse_infix(&mut self, lhs: Expr) -> Result<Expr, ParseError>;
-}
-```
-
-**三语关键词检查方法**：解析器需要能识别中文、拼音、英文三种关键词形式。建议封装 `check_keyword` 方法，同时接受三种形式：
-
-```rust
-fn check_keyword(&self, keywords: &[&str]) -> bool {
-    // 例如 check_keyword(&["令", "let", "ling"]) 
-    // 只要当前 Token 匹配三者之一即为 true
-}
-```
-
-**完整语法规则**：参考设计文档第 4 部分的完整 EBNF 语法规范。
-
-### 步骤三：实现语义分析
-
-**目标文件**：`src/sema/mod.rs`、`src/typeck/mod.rs`
-
-**核心数据结构**：
-
-```rust
-// 符号表
-pub struct SymbolTable {
-    scopes: Vec<Scope>,
-    current: usize,
-}
-
-impl SymbolTable {
-    pub fn new() -> Self;
-    pub fn enter_scope(&mut self);
-    pub fn exit_scope(&mut self);
-    pub fn define(&mut self, name: String, kind: SymbolKind, ty: Type) -> Result<(), SemanticError>;
-    pub fn resolve(&self, name: &str) -> Option<&Symbol>;
-}
-
-// 类型推导器
-pub struct TypeInfer {
-    next_var: usize,
-    substitutions: HashMap<usize, Type>,
-    env: Vec<HashMap<String, Type>>,
-}
-
-impl TypeInfer {
-    pub fn new() -> Self;
-    pub fn infer_program(&mut self, program: &Program) -> Result<(), TypeError>;
-    pub fn infer_expr(&mut self, expr: &Expr) -> Result<Type, TypeError>;
-    pub fn infer_stmt(&mut self, stmt: &Stmt) -> Result<(), TypeError>;
-    fn unify(&mut self, t1: Type, t2: Type) -> Result<(), TypeError>;
-}
-```
-
-**v0.1.0 最小目标**：能检查 `let x: int = "hello"` 这类基本类型错误。
-
-### 步骤四：实现 LLVM 代码生成
-
-**目标文件**：`src/codegen/mod.rs`
-
-**关键依赖**：在 `Cargo.toml` 中添加：
-
-```toml
-[dependencies]
-inkwell = { version = "0.5", features = ["llvm18-0"] }
-```
-
-**代码生成器结构**：
-
-```rust
-use inkwell::context::Context;
-use inkwell::module::Module;
-
-pub struct CodeGen<'ctx> {
-    context: &'ctx Context,
-    module: Module<'ctx>,
-    builder: Builder<'ctx>,
-    variables: HashMap<String, PointerValue<'ctx>>,
-}
-
-impl<'ctx> CodeGen<'ctx> {
-    pub fn new(context: &'ctx Context, name: &str) -> Self;
-    pub fn compile(&mut self, program: &Program) -> Result<(), CodeGenError>;
-    fn compile_function(&mut self, func: &Function) -> Result<(), CodeGenError>;
-    fn compile_stmt(&mut self, stmt: &Stmt) -> Result<(), CodeGenError>;
-    fn compile_expr(&mut self, expr: &Expr) -> Result<BasicValueEnum<'ctx>, CodeGenError>;
-}
-```
-
-**v0.1.0 最小目标**：能编译运行 `function main() -> int begin return 42 end`，生成可执行文件并输出退出码 42。
-
-### 步骤五：连接 CLI 与编译管线
-
-修改 `src/main.rs`，在 `build` 子命令中连接各个模块：
-
-```rust
-fn compile_file(input: &str, output: Option<&str>) -> Result<(), Box<dyn Error>> {
-    let source = std::fs::read_to_string(input)?;
-    
-    // 1. 词法分析
-    let mut lexer = Lexer::new(&source);
-    let (tokens, errors) = lexer.tokenize();
-    if !errors.is_empty() { /* 报告错误 */ }
-    
-    // 2. 语法分析
-    let mut parser = Parser::new(tokens);
-    let program = parser.parse()?;
-    
-    // 3. 语义分析
-    let mut infer = TypeInfer::new();
-    infer.infer_program(&program)?;
-    
-    // 4. 代码生成
-    let context = Context::create();
-    let mut codegen = CodeGen::new(&context, "main");
-    codegen.compile(&program)?;
-    codegen.write_bitcode(output.unwrap_or("a.out"))?;
-    
-    Ok(())
-}
-```
-
-
-## 四、编码规范
-
-### 4.1 Rust 代码规范
-
-- 所有源文件必须包含版权声明头部：
-```rust
-// Copyright © 2026 幻心梦梦（huanxinmengmeng）
-// 本项目依据项目根目录的 LICENSE 文件中的幻语许可证进行许可。
-```
-- 使用 `rustfmt` 格式化，每行最大宽度 100 字符
-- 使用 `snake_case` 命名函数和变量
-- 所有公共 API 必须添加文档注释
-- 函数体使用 `4空格` 缩进
-
-### 4.2 提交规范
-
-- 提交信息格式：`[模块] 简短描述`
-- 示例：`[parser] 实现 let 语句解析`、`[codegen] 完成二元表达式 LLVM IR 生成`
-- 每个提交应该是独立、可测试的最小变更
-
-### 4.3 模块开发顺序
-
-按优先级从高到低：
-
-| 顺序 | 模块 | 理由 |
-|------|------|------|
-| 1 | `ast.rs` | 所有后续模块的共同依赖 |
-| 2 | `parser/mod.rs` | 打通源码→AST 链路 |
-| 3 | `sema/mod.rs` | 在提交前检查错误 |
-| 4 | `codegen/mod.rs` | 生成可执行文件，验证整条链路 |
-| 5 | `tests/` | 回归保护 |
-
-
-## 五、编译与测试
-
-### 5.1 构建命令
+**安装示例（Ubuntu/Debian）**：
 
 ```bash
-# 开发构建
+# Rust 工具链
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source ~/.cargo/env
+
+# LLVM 18（含 MLIR）
+wget https://apt.llvm.org/llvm.sh
+chmod +x llvm.sh
+sudo ./llvm.sh 18
+sudo apt install libllvm18 llvm-18 llvm-18-dev llvm-18-runtime mlir-18-tools
+
+# CMake 和 Ninja
+sudo apt install cmake ninja-build
+```
+
+### 2.2 交叉编译附加依赖
+
+针对嵌入式目标（ARM Cortex-M、RISC-V 等），需额外安装对应的 GCC 工具链和调试器：
+
+```bash
+# ARM Cortex-M
+sudo apt install gcc-arm-none-eabi binutils-arm-none-eabi gdb-multiarch
+
+# RISC-V
+sudo apt install gcc-riscv64-unknown-elf
+
+# AVR
+sudo apt install gcc-avr avr-libc
+```
+
+### 2.3 环境变量
+
+```bash
+export LLVM_SYS_180_PREFIX=/usr/lib/llvm-18
+export HUAN_PATH=$HOME/.huan
+export PATH=$HUAN_PATH/bin:$PATH
+```
+
+
+## 三、获取并构建幻语编译器
+
+### 3.1 克隆仓库
+
+```bash
+git clone https://gitee.com/huanxinmengmeng/huanlang.git
+cd huanlang
+```
+
+### 3.2 构建 MLIR 方言组件
+
+幻语的 MLIR 方言（`huan` Dialect）用 C++ 实现，需要先用 CMake 构建：
+
+```bash
+cd dialects
+mkdir build && cd build
+
+cmake .. \
+  -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DMLIR_DIR=/usr/lib/llvm-18/lib/cmake/mlir \
+  -DLLVM_EXTERNAL_LIT=/usr/lib/llvm-18/build/utils/lit/lit.py
+
+ninja
+cd ../..
+```
+
+构建产物包括：
+- `dialects/build/lib/libHuanDialect.a`：幻语方言静态库
+- `dialects/build/lib/libLowerHuanToLLVM.a`：降级 Pass 静态库
+
+### 3.3 构建 Rust 编译器
+
+```bash
+# 开发构建（快速迭代）
 cargo build
 
-# 运行测试
-cargo test
-
-# 运行特定模块测试
-cargo test --test lexer_tests
-
-# 检查代码格式
-cargo fmt --check
-
-# 运行 Clippy
-cargo clippy -- -D warnings
+# 发布构建（优化性能）
+cargo build --release
 ```
 
-### 5.2 测试策略
+编译完成后，可执行文件位于 `target/debug/huan`（或 `target/release/huan`）。
 
-每个模块应包含：
-- **单元测试**：与源码同文件，`#[cfg(test)]` 模块中
-- **集成测试**：放在 `tests/` 目录，测试完整模块组合
+### 3.4 安装到系统
 
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parse_simple_let() {
-        let source = "令 年龄 为 25";
-        let mut lexer = Lexer::new(source);
-        let (tokens, _) = lexer.tokenize();
-        let mut parser = Parser::new(tokens);
-        let stmt = parser.parse_stmt().unwrap();
-        assert!(matches!(stmt, Stmt::Let { .. }));
-    }
-}
+```bash
+cargo install --path .
 ```
 
-### 5.3 CI 配置
+或者手动复制：
 
-在 `.gitee/ci.yml` 或 GitHub Actions 中配置自动构建和测试：
-
-```yaml
-name: 幻语 CI
-on: [push, pull_request]
-jobs:
-  build-and-test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: 构建
-        run: cargo build --verbose
-      - name: 测试
-        run: cargo test --verbose
-      - name: 格式检查
-        run: cargo fmt --check
-      - name: Clippy
-        run: cargo clippy -- -D warnings
+```bash
+cp target/release/huan $HOME/.huan/bin/
 ```
 
 
-## 六、关键参考文档索引
+## 四、构建运行时库
 
-| 需要实现的功能 | 参考设计文档部分 |
-|-------------|----------------|
-| 词法分析器扩展 | 第 3 部分：词法分析规范 |
-| 语法解析器实现 | 第 4 部分：语法解析规范 |
-| AST 节点定义 | 第 5 部分：AST 完整定义 |
-| 类型系统与推导 | 第 6 部分：语义分析与类型系统 |
-| 内存管理 | 第 7 部分：内存管理与所有权模型 |
-| 并发模型 | 第 8 部分：并发模型规范 |
-| 汇编支持 | 第 9 部分：汇编与裸机编程规范 |
-| MLIR 方言定义 | 第 10 部分：MLIR 方言定义与降级规范 |
-| LLVM 代码生成 | 第 11 部分：后端代码生成接口 |
-| 跨语言互操作 | 第 12 部分：互操作与跨语言转换框架 |
-| 标准库 API | 第 15 部分：标准库 API 完整定义 |
-| 测试框架 | 第 18 部分：测试框架与基准测试规范 |
-| 完整代码示例 | 第 21 部分：附录 |
+幻语运行时库（`libhuanrt`）提供列表、字符串、字典、输出函数和分配器等基础能力的 C 语言实现。
 
+### 4.1 编译运行时库
 
-## 七、开发路线图
+```bash
+cd runtime
+mkdir build && cd build
 
-| 里程碑 | 目标 | 关键交付 | 状态 |
-|--------|------|---------|------|
-| **v0.1.0** | 最小可编译链路 | AST 定义 + 基础解析器 + 简单表达式编译 | ✅ 已完成 |
-| **v0.2.0** | 完整前端 | 全部语法结构解析 + Hindley-Milner 类型推导 | ✅ 已完成 |
-| **v0.3.0** | 基础运行时 | 标准库核心模块 + 所有权模式可选启用 | ✅ 已完成 |
-| **v0.4.0** | 嵌入式和跨语言 | 内联汇编 + 裸机支持 + C FFI | 🔄 进行中 |
-| **v0.5.0** | 完整工具链 | 包管理器 + LSP + 内置编辑器 | 🔄 进行中 |
-| **v1.0.0** | 自举稳定 | 编译器自举 + 语言特性冻结 | 📋 规划中 |
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(nproc)
+
+cd ../..
+```
+
+构建产物：
+- `runtime/build/libhuanrt.a`（静态库）
+- `runtime/build/libhuanrt.so`（动态库，Linux）
+- `runtime/build/huanrt.lib`（Windows）
+
+### 4.2 安装运行时库
+
+```bash
+cp runtime/build/libhuanrt.a $HOME/.huan/lib/
+cp runtime/ming_runtime.h $HOME/.huan/include/
+```
 
 
-## 八、最后说明
+## 五、构建标准库
 
-1. **设计文档在 `/docs` 目录**中，是开发的核心参考。
-2. **每个模块开发前**，建议先阅读设计文档中对应部分，了解完整的接口定义和数据结构。
-3. **核心编译器模块已全部实现**：词法分析器、语法解析器、语义分析器、LLVM 代码生成、标准库等。
-4. **提交 PR 时**，请确保通过 `cargo fmt`、`cargo clippy` 和 `cargo test` 三项检查。
-5. **沟通渠道**：云湖群聊 ID `722904639`，维护者云湖用户 ID `1925442`。
+幻语标准库本身用幻语编写，需要用已构建好的编译器来编译。在 CI 或正式构建流程中，这一步在编译器构建完成后自动执行。
 
----
+### 5.1 标准库源码结构
 
-## 九、近期开发记录
+标准库位于 `stdlib/` 目录，按模块组织：
 
-### 2026-04-25
+```
+stdlib/
+├── 核心.hl
+├── 数学.hl
+├── 集合.hl
+├── 字符串.hl
+├── 文件系统.hl
+├── 网络.hl
+├── 并发.hl
+├── 序列化.hl
+├── 加密.hl
+├── 系统.hl
+└── 随机.hl
+```
 
-| 模块 | 变更内容 | 文件 |
-|------|---------|------|
-| Parser | 清理调试代码，增强后缀表达式解析，修复借用错误 | `src/core/parser/parser.rs` |
-| SemanticAnalyzer | 增强类型推断，支持更多表达式和语句类型 | `src/core/sema/sema.rs` |
-| MLIR | 增强二元/一元操作转换，支持更多语法结构 | `src/core/mlir/conversion.rs` |
-| CLI | 实现 `huan check` 命令，添加类型检查功能 | `src/tools/cli/commands.rs` |
-| Stdlib | 新增 Console 模块，支持控制台彩色输出 | `src/stdlib/console/` |
-| Tests | 添加 Parser 和 SemanticAnalyzer 单元测试 | `src/core/parser/parser.rs`, `src/core/sema/sema.rs` |
-| Examples | 修复 LLVM 代码生成示例 | `examples/test_llvm_codegen.rs` |
-| DOTO.md | 更新开发进度和里程碑状态 | `DOTO.md` |
+### 5.2 编译标准库
 
-### 2026-04-26
+```bash
+# 假设 huan 已在 PATH 中
+cd stdlib
 
-| 模块 | 变更内容 | 文件 |
-|------|---------|------|
-| Memory | 新增 Weak（弱引用）智能指针模块，完善 Rc/Weak 实现 | `src/core/memory/weak.rs`, `src/core/memory/mod.rs` |
-| Tests | 修复 weak.rs 中的测试用例，使用标准库实现 | `src/core/memory/weak.rs` |
-| 代码审查 | 验证项目符合"幻语编程语言标准规范"要求 | - |
+# 编译所有标准库模块为静态库
+huan build 核心.hl --emit lib --output ../target/huanrt/libcore.a
+huan build 数学.hl --emit lib --output ../target/huanrt/libmath.a
+huan build 集合.hl --emit lib --output ../target/huanrt/libcollections.a
+# ... 其余模块同理
 
-### 测试结果
+# 或者使用批量构建命令（如已实现）
+huan build --workspace --emit lib
+```
 
-| 测试类别 | 通过 | 失败 | 总计 |
-|---------|------|------|------|
-| 库单元测试 | 206 | 9 | 215 |
-| 内存模块测试 | 5 | 0 | 5 |
-| 解析器测试 | 26 | 0 | 26 |
-| 语义分析测试 | 21 | 0 | 21 |
-| MLIR 测试 | 12 | 0 | 12 |
-| 标准库测试 | 50+ | 0 | 50+ |
+标准库编译产物默认输出到 `$HUAN_PATH/lib/`，供后续用户程序链接时自动查找。
 
-### 2026-05-10
 
-| 模块 | 变更内容 | 文件 |
-|------|---------|------|
-| Parser | 修复 `expect_ident` 方法，支持将上下文中的关键词（如 add、sub 等）作为标识符处理 | `src/core/parser/parser.rs` |
-| Parser | 修复 `parse_type` 方法，添加对所有类型关键词（TypeInt、TypeI8、TypeBool 等）的处理 | `src/core/parser/parser.rs` |
-| Keywords | 修复关键词映射，同时支持 "func" 和 "function" 作为函数关键词 | `src/core/lexer/keywords.rs` |
-| Keywords | 修复 `to_english` 方法，为 `TokenKind::Func` 返回 "func" | `src/core/lexer/keywords.rs` |
+## 六、编写并编译用户程序
 
-### 测试结果
+### 6.1 最简单的程序
 
-| 测试类别 | 通过 | 失败 | 总计 |
-|---------|------|------|------|
-| 库单元测试 | 215 | 0 | 215 |
-| 解析器测试 | 26 | 0 | 26 |
+创建文件 `hello.hl`：
+
+```hl
+函数 主() 返回 整数
+开始
+    显示("你好，世界！")
+    返回 0
+结束
+```
+
+### 6.2 编译并运行
+
+```bash
+# 编译并直接运行
+huan run hello.hl
+
+# 或者分步操作
+huan build hello.hl -o hello       # 编译为可执行文件
+./hello                             # 运行
+```
+
+**内部流程**（编译器自动完成）：
+
+```
+hello.hl
+  → [词法分析器] → Token 流
+  → [语法解析器] → AST
+  → [语义分析器] → 类型标注的 AST
+  → [MLIR 生成器] → huan 方言 MLIR
+  → [降级 Pass] → scf/arith/func/llvm 方言 MLIR
+  → [LLVM 后端] → 目标文件 (.o)
+  → [链接器] → 可执行文件 (hello)
+```
+
+### 6.3 编译选项
+
+```bash
+# 优化级别
+huan build hello.hl -O 0          # 无优化，调试用
+huan build hello.hl -O 2          # 标准优化（默认）
+huan build hello.hl -O 3          # 激进优化
+huan build hello.hl -O s          # 尺寸优化
+
+# 查看中间产物
+huan build hello.hl --emit llvm-ir -o hello.ll   # 输出 LLVM IR
+huan build hello.hl --emit asm -o hello.s         # 输出汇编代码
+
+# 生成调试信息
+huan build hello.hl --debug
+
+# 启用所有权检查
+huan build hello.hl --ownership
+
+# 链接时优化
+huan build hello.hl --release --lto
+```
+
+### 6.4 多文件项目
+
+项目结构：
+
+```
+myproject/
+├── 幻语包.toml
+├── 源码/
+│   ├── 主程序.hl
+│   ├── 模型.hl
+│   └── 工具.hl
+└── 测试/
+    └── 全部测试.hl
+```
+
+`幻语包.toml`：
+
+```toml
+[package]
+name = "myproject"
+version = "0.1.0"
+
+[[bin]]
+name = "myproject"
+path = "源码/主程序.hl"
+
+[dependencies]
+网络 = "0.3"
+```
+
+构建命令：
+
+```bash
+cd myproject
+
+# 构建
+huan package build
+
+# 运行
+huan package run
+
+# 测试
+huan package test
+```
+
+
+## 七、裸机/嵌入式构建方案
+
+### 7.1 目标三元组
+
+| 平台 | 三元组 | 说明 |
+|------|--------|------|
+| Cortex-M3 | `thumbv7m-none-eabi` | STM32F1 系列 |
+| Cortex-M4（硬浮点） | `thumbv7em-none-eabihf` | STM32F4 系列 |
+| Cortex-M0 | `thumbv6m-none-eabi` | STM32F0 系列 |
+| RISC-V 32 | `riscv32imac-unknown-none-elf` | GD32V 系列 |
+| RISC-V 64 | `riscv64gc-unknown-none-elf` | — |
+| AVR | `avr-unknown-none` | ATmega 系列 |
+| ESP32 | `xtensa-esp32-none-elf` | ESP32 系列 |
+
+### 7.2 添加目标工具链
+
+```bash
+# 安装 Rust 目标
+rustup target add thumbv7em-none-eabihf
+rustup target add riscv32imac-unknown-none-elf
+```
+
+### 7.3 裸机项目结构
+
+```
+blinky/
+├── 幻语包.toml
+├── 链接脚本.hld             # 链接器脚本
+├── 启动代码.has m           # 汇编启动代码
+├── 主程序.hl                # 主程序
+└── 目标配置.toml            # 芯片配置
+```
+
+`目标配置.toml`：
+
+```toml
+[目标]
+架构 = "cortex-m4"
+芯片 = "STM32F407VG"
+频率 = 168_000_000
+
+[内存]
+闪存起始 = "0x08000000"
+闪存大小 = "1M"
+内存起始 = "0x20000000"
+内存大小 = "128K"
+```
+
+`链接脚本.hld`：
+
+```hl
+内存布局:
+    闪存: 起始 0x08000000, 长度 64K, 属性(可读, 可执行)
+    内存: 起始 0x20000000, 长度 20K, 属性(可读, 可写, 可执行)
+
+段定义:
+    .向量表: 放入 闪存, 对齐 256
+    .文本: 放入 闪存
+    .数据: 放入 内存, 加载地址在 闪存
+    .bss: 放入 内存, 清零
+结束
+```
+
+### 7.4 编译裸机程序
+
+```bash
+# 汇编启动代码
+huan asm 启动代码.has m --target thumbv7em-none-eabihf -o 启动代码.o
+
+# 编译主程序
+huan build 主程序.hl \
+  --target thumbv7em-none-eabihf \
+  --link-script 链接脚本.hld \
+  --optimize z \
+  --ownership \
+  --output 固件.elf
+
+# 生成烧录文件
+huan convert 固件.elf --format bin --output 固件.bin
+huan convert 固件.elf --format hex --output 固件.hex
+```
+
+### 7.5 烧录与调试
+
+```bash
+# 烧录
+huan flash 固件.bin --chip STM32F407VG --interface swd
+
+# 调试
+huan debug 固件.elf --interface swd --remote :3333
+```
+
+### 7.6 完整裸机示例（STM32F103 LED 闪烁）
+
+```hl
+@不标准
+@目标("thumbv7m-none-eabi")
+
+外设 GPIOA 基址 0x40010800:
+    寄存器 CRL  偏移 0x00, 类型 无符号32
+    寄存器 BSRR 偏移 0x10, 类型 无符号32
+结束
+
+外设 RCC 基址 0x40021000:
+    寄存器 APB2ENR 偏移 0x18, 类型 无符号32
+结束
+
+@导出 "C"
+函数 主()
+开始
+    令 RCC.APB2ENR.位(2) 设为 真
+    令 GPIOA.CRL.位域(0..4) 设为 0b0011
+
+    当 真 循环
+        GPIOA.BSRR 设为 0x00000001
+        重复 500000 次
+            汇编!("nop")
+        结束
+        GPIOA.BSRR 设为 0x00010000
+        重复 500000 次
+            汇编!("nop")
+        结束
+    结束
+结束
+```
+
+
+## 八、JIT 执行引擎
+
+幻语支持通过 LLVM JIT 直接执行代码，无需生成文件。
+
+### 8.1 REPL 交互执行
+
+```bash
+huan repl
+>>> 令 甲 = 10
+>>> 令 乙 = 20
+>>> 甲 + 乙
+30
+>>> 退出
+```
+
+### 8.2 JIT 执行单文件
+
+```bash
+huan run 脚本.hl
+```
+
+`huan run` 的内部流程：
+1. 解析源文件生成 AST。
+2. 语义检查通过后，生成 LLVM IR。
+3. 通过 LLVM JIT 引擎立即执行。
+4. 执行完毕后释放所有 JIT 资源。
+
+这使得幻语适用于脚本式开发和快速原型验证。
+
+
+## 九、快速参考卡片
+
+### 9.1 日常开发命令
+
+```bash
+huan run 程序.hl                  # 一键运行
+huan build 程序.hl                # 编译
+huan check 程序.hl                # 仅检查（不生成代码）
+huan fmt 程序.hl                  # 格式化
+huan test                         # 运行测试
+huan repl                         # 启动 REPL
+huan edit 程序.hl                 # 内置编辑器
+```
+
+### 9.2 发布构建命令
+
+```bash
+huan build 程序.hl --release --lto --strip
+huan build 程序.hl --target wasm32-unknown-unknown --release
+```
+
+### 9.3 跨语言转换命令
+
+```bash
+huan transpile 程序.hl --to rust -o 程序.rs
+huan transpile 程序.hl --to c -o 程序.c
+huan transpile 程序.hl --to python -o 程序.py
+```
+
+
+## 十、常见问题排查
+
+| 问题 | 可能原因 | 解决方式 |
+|------|---------|---------|
+| `llvm-config not found` | LLVM 未安装或版本不对 | 检查 `llvm-config-18 --version` |
+| `mlir/IR/BuiltinTypes.h not found` | MLIR 开发包缺失 | 安装 `mlir-18-dev` 或 `mlir-18-tools` |
+| 链接时找不到 `huanrt` | 运行时库未构建 | 进入 `runtime/` 目录执行 `cmake .. && make` |
+| `error: could not compile` | Rust 版本过低 | `rustup update` |
+| 交叉编译找不到 GCC | ARM/RISC-V 工具链未安装 | 安装对应 `gcc-arm-none-eabi` 等 |
+| `todo!()` panic | 对应编译器功能尚未实现 | 当前版本部分功能仍在开发中 |
+
+## 十一、开发进度与计划
+
+### 已完成的任务
+
+1. **构建 MLIR 方言组件（C++实现）**
+   - 实现了 `huan` 方言的完整定义
+   - 实现了到 SCF、Arith、Func 和 LLVM 方言的降级 Pass
+   - 提供了完整的 MLIR 操作和类型支持
+
+2. **构建运行时库 libhuanrt**
+   - 实现了内存分配器、字符串、列表、映射等核心模块
+   - 提供了 IO 和控制台功能
+   - 支持跨平台编译
+
+3. **编译标准库（用已构建的编译器）**
+   - 验证了编译器能够成功编译标准库模块
+   - 确保标准库的完整性和可用性
+
+4. **编写完整的测试套件**
+   - 编写了 MLIR 方言测试
+   - 编写了运行时库测试
+   - 提供了测试运行脚本
+
+5. **完善 JIT 执行引擎和 REPL 功能**
+   - 实现了基于解释器的 JIT 执行
+   - 完善了 REPL 交互式环境
+   - 支持多行输入和错误处理
+
+6. **实现跨语言转换功能**
+   - 支持从幻语转译到 Rust、Python、C 等语言
+   - 支持从其他语言导入到幻语
+   - 提供了文件转译功能
+
+7. **完善命令行工具的编译选项支持**
+   - 添加了 debug、ownership、lto、release、strip 等选项
+   - 支持 target 和 emit 选项
+   - 提供了更灵活的编译配置
+
+8. **完善裸机/嵌入式构建支持**
+   - 添加了 Cortex-M、RISC-V、AVR 和 ESP32 等嵌入式目标
+   - 支持交叉编译和固件生成
+
+### 后续计划
+
+1. **完善 MLIR 方言的实现**
+   - 增强对复杂语法结构的支持
+   - 优化降级 Pass 的性能
+
+2. **改进运行时库**
+   - 添加更多标准库功能
+   - 优化内存管理和性能
+
+3. **增强跨语言转换能力**
+   - 支持更多目标语言
+   - 提高转换的准确性和效率
+
+4. **完善嵌入式支持**
+   - 添加更多嵌入式目标平台
+   - 提供完整的嵌入式开发工具链
+
+5. **编写更完整的文档**
+   - 完善用户开发文档
+   - 添加 API 参考文档
+
+6. **性能优化**
+   - 优化编译器性能
+   - 提高代码生成质量
+
+7. **测试与验证**
+   - 增加更多测试用例
+   - 确保系统的稳定性和可靠性
+
+## 十二、总结
+
+整个幻语的构建和运行流程可以概括为以下路线：
+
+1. **环境**：Rust + LLVM/MLIR + CMake + (交叉编译工具链)
+2. **构建编译器**：CMake 构建方言 → Cargo 构建 Rust 编译器
+3. **构建运行时**：CMake 构建 `libhuanrt`
+4. **编译标准库**：用 `huan` 编译 `stdlib/*.hl`
+5. **用户开发**：`huan run`（JIT）或 `huan build`（静态编译）
+6. **嵌入式**：加 `--target` 参数，汇编启动代码，生成固件并烧录

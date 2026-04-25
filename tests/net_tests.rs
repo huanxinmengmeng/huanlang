@@ -19,7 +19,7 @@ fn test_udp_socket() {
     
     // 接收数据
     let mut buffer = [0; 1024];
-    let (n, addr2) = socket1.接收从(&mut buffer).unwrap();
+    let (n, _addr2) = socket1.接收从(&mut buffer).unwrap();
     assert_eq!(n, data.len());
     assert_eq!(&buffer[..n], data);
     
