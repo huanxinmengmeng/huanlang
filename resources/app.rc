@@ -1,0 +1,6 @@
+# Windows Resource Script for HuanLang Icon
+# This file defines the icon resources for the Windows executable
+
+#define FR_ICON 1000
+
+FR_ICON ICON "icon.ico"

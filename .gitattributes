@@ -1,0 +1,18 @@
+# 所有文本文件自动处理行尾（提交时转 LF，检出时根据平台转 CRLF 或 LF）
+* text=auto
+
+# Rust 源文件强制保持 LF（可避免 Windows 上意外换行，但 text=auto 已足够）
+*.rs text eol=lf
+
+# Markdown 文件保持 LF（方便跨平台 diff）
+*.md text eol=lf
+
+# LLVM IR 保持 LF
+*.ll text eol=lf
+
+# Windows 资源文件可能需要 CRLF，但交给 text=auto 处理即可
+# *.rc text eol=crlf
+
+# 二进制文件明确标记为 binary，Git 不会尝试转换
+*.png binary
+*.ico binary

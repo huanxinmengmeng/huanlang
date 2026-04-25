@@ -1,0 +1,128 @@
+# Build directories
+target/
+dist/
+build/
+out/
+
+# Rust build artifacts
+**/*.rs.bk
+Cargo.lock
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+Thumbs.db
+.DS_Store
+
+# Temporary files
+*.tmp
+*.temp
+
+# Binary files
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test artifacts
+coverage/
+
+# Log files
+*.log
+
+# Package manager files
+.npm/
+.yarn/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Rust specific
+.cargo/
+
+# Build output from other tools
+*.o
+*.obj
+*.elf
+
+# Documentation build output
+docs/_build/
+docs/_static/
+docs/_templates/
+
+# Python build artifacts (if any)
+__pycache__/
+*.pyc
+
+# Node.js build artifacts (if any)
+node_modules/
+
+# C/C++ build artifacts (if any)
+*.a
+*.la
+*.lo
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+*.app
+
+# Swift build artifacts (if any)
+.build/
+DerivedData/
+
+# Go build artifacts (if any)
+bin/
+pkg/
+
+# Java build artifacts (if any)
+target/
+build/
+out/
+
+# TypeScript build artifacts (if any)
+dist/
+build/
+
+# Ruby build artifacts (if any)
+bundle/
+
+# PHP build artifacts (if any)
+vendor/
+
+# .NET build artifacts (if any)
+bin/
+obj/
+
+# Scala build artifacts (if any)
+target/
+
+# Kotlin build artifacts (if any)
+build/
+
+# R build artifacts (if any)
+.Rhistory
+.RData
+
+# Julia build artifacts (if any)
+Manifest.toml
+Project.toml
+
+# Elixir build artifacts (if any)
+deps/
+_build/
+
+# Erlang build artifacts (if any)
+ebin/
+
+# Haskell build artifacts (if any)
+dist/
+build/

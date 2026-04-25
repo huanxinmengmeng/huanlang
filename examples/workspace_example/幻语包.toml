@@ -1,0 +1,10 @@
+[package]
+name = "workspace-example"
+version = "0.1.0"
+
+[workspace]
+members = ["core", "utils", "app"]
+
+[workspace.dependencies]
+网络 = "0.3"
+序列化 = "1.0"

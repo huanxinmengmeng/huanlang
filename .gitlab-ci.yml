@@ -1,0 +1,80 @@
+# Copyright © 2026 幻心梦梦（huanxinmengmeng）
+# 本项目依据项目根目录的 LICENSE 文件中的幻语许可证进行许可。
+
+stages:
+  - build
+  - test
+  - lint
+  - benchmark
+  - coverage
+
+variables:
+  CARGO_HOME: $CI_PROJECT_DIR/.cargo
+  CARGO_TARGET_DIR: $CI_PROJECT_DIR/target
+
+.build_template:
+  before_script:
+    - curl -fsSL https://huanlang.org/install.sh | sh
+  script:
+    - huan build --release
+  artifacts:
+    paths:
+      - target/release/huan
+    expire_in: 1 week
+
+build:linux:
+  stage: build
+  extends: .build_template
+  tags:
+    - linux
+
+build:windows:
+  stage: build
+  extends: .build_template
+  tags:
+    - windows
+  script:
+    - Invoke-WebRequest -Uri https://huanlang.org/install.ps1 -OutFile install.ps1
+    - .\install.ps1
+    - huan build --release
+
+test:
+  stage: test
+  needs: [ build:linux ]
+  script:
+    - huan test --format junit --coverage --coverage-output ./coverage
+  coverage: '/行覆盖率: (\d+\.\d+)%/'
+  artifacts:
+    reports:
+      junit: target/junit.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: target/coverage/cobertura.xml
+    paths:
+      - target/coverage/
+    expire_in: 1 week
+
+lint:
+  stage: lint
+  needs: []
+  script:
+    - huan fmt --check
+
+benchmark:
+  stage: benchmark
+  needs: [ test ]
+  only:
+    - main
+    - tags
+  script:
+    - huan test --bench --bench-baseline baseline.json
+  artifacts:
+    paths:
+      - baseline.json
+    expire_in: 1 month
+
+coverage:
+  stage: coverage
+  needs: [ test ]
+  script:
+    - echo "覆盖率报告生成"

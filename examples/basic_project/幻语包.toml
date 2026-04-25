@@ -1,0 +1,64 @@
+[package]
+name = "basic-project"
+version = "0.1.0"
+edition = "1.2"
+authors = ["测试者 <test@example.com>"]
+description = "基础项目示例"
+license = "MIT"
+
+[dependencies]
+网络 = "0.3"
+序列化 = { version = "1.0", optional = true }
+
+[dev-dependencies]
+测试工具 = "0.5"
+
+[build-dependencies]
+构建工具 = "0.2"
+
+[features]
+default = ["std"]
+std = []
+json = ["序列化"]
+
+[lib]
+name = "basic_project"
+path = "src/lib.幻"
+
+bin = [
+    {
+        name = "basic-project",
+        path = "src/main.幻"
+    }
+]
+
+[examples]
+hello = {
+    name = "hello",
+    path = "examples/hello.幻"
+}
+
+[tests]
+test_basic = {
+    name = "test_basic",
+    path = "tests/test_basic.幻"
+}
+
+[benches]
+benchmark = {
+    name = "benchmark",
+    path = "benches/benchmark.幻"
+}
+
+[build]
+opt_level = 2
+target = "x86_64-pc-windows-msvc"
+
+[profile.dev]
+opt_level = 0
+debug = true
+
+[profile.release]
+opt_level = 3
+debug = false
+lto = true

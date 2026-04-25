@@ -1,0 +1,95 @@
+# Copyright © 2026 幻心梦梦（huanxinmengmeng）
+# 本项目依据项目根目录的 LICENSE 文件中的幻语许可证进行许可。
+
+name: 幻语CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    name: 运行测试
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+        rust-version: [ stable, nightly ]
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      
+      - name: 安装幻语
+        run: |
+          curl -fsSL https://huanlang.org/install.sh | sh
+          # 或者如果没有安装脚本，则构建
+      
+      - name: 构建项目
+        run: huan build --release
+      
+      - name: 运行测试
+        run: huan test --format junit --coverage --coverage-output ./coverage
+      
+      - name: 运行基准测试
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: huan test --bench --bench-baseline ./baseline.json
+      
+      - name: 上传测试报告
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ matrix.os }}
+          path: |
+            target/junit.xml
+            target/coverage/
+
+  lint:
+    name: 代码检查
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          # 这里运行幻语的 lint 工具
+          echo "Linting"
+
+  coverage:
+    name: 覆盖率报告
+    runs-on: ubuntu-latest
+    needs: test
+    if: always()
+    
+    steps:
+      - name: 下载覆盖率报告
+        uses: actions/download-artifact@v4
+        with:
+          name: test-results-ubuntu-latest
+      
+      - name: 上传到 Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          directory: coverage/
+          flags: unittests
+
+  release:
+    name: 创建发行版
+    needs: [ test, lint ]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: 构建发布版本
+        run: huan build --release
+      
+      - name: 创建 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            target/release/huan
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
