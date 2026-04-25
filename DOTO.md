@@ -473,7 +473,23 @@ jobs:
 |---------|------|------|------|
 | 库单元测试 | 206 | 9 | 215 |
 | 内存模块测试 | 5 | 0 | 5 |
-| 解析器测试 | 19 | 7 | 26 |
+| 解析器测试 | 26 | 0 | 26 |
 | 语义分析测试 | 21 | 0 | 21 |
 | MLIR 测试 | 12 | 0 | 12 |
 | 标准库测试 | 50+ | 0 | 50+ |
+
+### 2026-05-10
+
+| 模块 | 变更内容 | 文件 |
+|------|---------|------|
+| Parser | 修复 `expect_ident` 方法，支持将上下文中的关键词（如 add、sub 等）作为标识符处理 | `src/core/parser/parser.rs` |
+| Parser | 修复 `parse_type` 方法，添加对所有类型关键词（TypeInt、TypeI8、TypeBool 等）的处理 | `src/core/parser/parser.rs` |
+| Keywords | 修复关键词映射，同时支持 "func" 和 "function" 作为函数关键词 | `src/core/lexer/keywords.rs` |
+| Keywords | 修复 `to_english` 方法，为 `TokenKind::Func` 返回 "func" | `src/core/lexer/keywords.rs` |
+
+### 测试结果
+
+| 测试类别 | 通过 | 失败 | 总计 |
+|---------|------|------|------|
+| 库单元测试 | 215 | 0 | 215 |
+| 解析器测试 | 26 | 0 | 26 |

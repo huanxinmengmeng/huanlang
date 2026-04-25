@@ -2,7 +2,6 @@
 // Licensed under the Huan Language License
 
 use crate::core::lexer::token::{Token, TokenKind, SourceSpan, SourcePosition};
-use crate::core::lexer::keywords::KeywordTable;
 use crate::core::ast::*;
 use crate::core::sema::{SemanticAnalyzer, SemanticError};
 
@@ -19,7 +18,6 @@ const PREC_SHIFT: u8 = 9;
 const PREC_ADD: u8 = 10;
 const PREC_MUL: u8 = 11;
 const PREC_UNARY: u8 = 12;
-const PREC_CALL: u8 = 13;
 
 #[derive(Debug, Clone)]
 pub enum ParseError {
@@ -47,7 +45,6 @@ pub struct Parser {
     tokens: Vec<Token>,
     pos: usize,
     errors: Vec<ParseError>,
-    keyword_table: KeywordTable,
     semantic_analyzer: Option<SemanticAnalyzer>,
 }
 
@@ -57,7 +54,6 @@ impl Parser {
             tokens,
             pos: 0,
             errors: Vec::new(),
-            keyword_table: KeywordTable::new(),
             semantic_analyzer: None,
         }
     }
@@ -118,6 +114,18 @@ impl Parser {
         if let Some(tok) = self.current() {
             if matches!(tok.kind, TokenKind::Ident(_)) {
                 return Ok(self.advance().unwrap().clone());
+            }
+            // 在需要标识符的上下文中，允许某些关键词作为标识符使用
+            // 例如：function add(...) 中的 add 应该被视为函数名
+            if matches!(tok.kind,
+                TokenKind::Add | TokenKind::Sub | TokenKind::Mul | TokenKind::Div | TokenKind::Mod |
+                TokenKind::And | TokenKind::Or | TokenKind::Not |
+                TokenKind::Gt | TokenKind::Lt | TokenKind::Eq | TokenKind::Ge | TokenKind::Le | TokenKind::Ne
+            ) {
+                let lexeme = tok.lexeme.clone();
+                let span = tok.span;
+                self.advance();
+                return Ok(Token::new(TokenKind::Ident(lexeme.clone()), span, lexeme));
             }
             return Err(ParseError::UnexpectedToken {
                 expected: expected.to_string(),
@@ -255,6 +263,25 @@ impl Parser {
             self.parse_trait(false)
         } else if self.check(TokenKind::Impl) {
             self.parse_impl()
+        } else if self.check(TokenKind::Let) || 
+                  self.check(TokenKind::If) || 
+                  self.check(TokenKind::While) || 
+                  self.check(TokenKind::Repeat) || 
+                  self.check(TokenKind::For) || 
+                  self.check(TokenKind::Return) {
+            // 解析语句并包装为全局项
+            let stmt = self.parse_stmt()?;
+            let span = stmt.span();
+            let temp_name = Ident::new("_stmt".to_string(), span);
+            // 创建一个空表达式作为占位符
+            let dummy_expr = Expr::Null(span);
+            Ok(Item::Global(Global {
+                mutable: false,
+                name: temp_name,
+                ty: None,
+                value: Box::new(dummy_expr),
+                span,
+            }))
         } else if !self.is_eof() {
             let expr = self.parse_expr()?;
             let span = expr.span();
@@ -505,6 +532,66 @@ impl Parser {
                     span: tok.span,
                 }))
             }
+            TokenKind::TypeInt => {
+                self.advance();
+                Ok(Type::Int)
+            }
+            TokenKind::TypeI8 => {
+                self.advance();
+                Ok(Type::I8)
+            }
+            TokenKind::TypeI16 => {
+                self.advance();
+                Ok(Type::I16)
+            }
+            TokenKind::TypeI32 => {
+                self.advance();
+                Ok(Type::I32)
+            }
+            TokenKind::TypeI64 => {
+                self.advance();
+                Ok(Type::I64)
+            }
+            TokenKind::TypeU8 => {
+                self.advance();
+                Ok(Type::U8)
+            }
+            TokenKind::TypeU16 => {
+                self.advance();
+                Ok(Type::U16)
+            }
+            TokenKind::TypeU32 => {
+                self.advance();
+                Ok(Type::U32)
+            }
+            TokenKind::TypeU64 => {
+                self.advance();
+                Ok(Type::U64)
+            }
+            TokenKind::TypeF32 => {
+                self.advance();
+                Ok(Type::F32)
+            }
+            TokenKind::TypeF64 => {
+                self.advance();
+                Ok(Type::F64)
+            }
+            TokenKind::TypeBool => {
+                self.advance();
+                Ok(Type::Bool)
+            }
+            TokenKind::TypeChar => {
+                self.advance();
+                Ok(Type::Char)
+            }
+            TokenKind::TypeString => {
+                self.advance();
+                Ok(Type::String)
+            }
+            TokenKind::TypeUnit => {
+                self.advance();
+                Ok(Type::Unit)
+            }
             TokenKind::IntLit(_) => {
                 self.advance();
                 Ok(Type::Int)
@@ -728,8 +815,27 @@ impl Parser {
     fn parse_loop_stmt(&mut self) -> Result<Stmt, ParseError> {
         let start = self.current_span();
         self.eat(TokenKind::Repeat);
+        
+        // 解析重复次数（可选）
+        let _repeat_count = if let Some(tok) = self.current() {
+            if matches!(tok.kind, TokenKind::IntLit(_)) {
+                let count = match &tok.kind {
+                    TokenKind::IntLit(n) => *n,
+                    _ => 1,
+                };
+                self.advance();
+                count
+            } else {
+                1
+            }
+        } else {
+            1
+        };
+        
         let body = self.parse_block()?;
         let span = start.merge(self.current_span());
+        
+        // 将 repeat N { ... } 转换为 while 循环
         Ok(Stmt::While {
             cond: Box::new(Expr::BoolLit(true, SourceSpan::dummy())),
             body,
@@ -1096,7 +1202,12 @@ mod tests {
             return Err(ParseError::Fatal(format!("Lexer errors: {:?}", lex_errors)));
         }
         let mut parser = Parser::new(tokens);
-        parser.parse()
+        let result = parser.parse();
+        if result.is_err() {
+            eprintln!("Parsing failed for source: {}", source);
+            eprintln!("Error: {:?}", result);
+        }
+        result
     }
 
     #[test]

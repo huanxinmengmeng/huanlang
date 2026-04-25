@@ -49,6 +49,7 @@ const KEYWORD_TRIPLES: &[(&str, &str, &str, TokenKind)] = &[
     ("中", "zhong", "do", TokenKind::Do),
     ("开始", "kaishi", "begin", TokenKind::Begin),
     ("函数", "hanshu", "func", TokenKind::Func),
+    ("函数", "hanshu", "function", TokenKind::Func),
     ("返回", "fanhui", "return", TokenKind::Return),
     ("结构", "jiegou", "struct", TokenKind::Struct),
     ("字段", "ziduan", "field", TokenKind::Field),
@@ -181,6 +182,11 @@ impl KeywordTable {
 
     /// 转换为英文关键词
     pub fn to_english(&self, kind: &TokenKind) -> Option<&'static str> {
+        // 特殊处理 Func 类型，始终返回 "func"
+        if std::mem::discriminant(kind) == std::mem::discriminant(&TokenKind::Func) {
+            return Some("func");
+        }
+        
         for &(_, _, en, ref k) in KEYWORD_TRIPLES {
             if std::mem::discriminant(kind) == std::mem::discriminant(k) {
                 return Some(en);

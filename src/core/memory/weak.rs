@@ -2,7 +2,6 @@
 // 本项目依据项目根目录的 LICENSE 文件中的幻语许可证进行许可。
 
 use std::marker::PhantomData;
-use std::cell::Cell;
 use std::rc::Rc as StdRc;
 use std::rc::Weak as StdWeak;
 

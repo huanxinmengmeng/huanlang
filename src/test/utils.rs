@@ -4,7 +4,6 @@
 //! 测试工具函数模块
 
 use std::path::PathBuf;
-use std::env;
 use std::fs;
 
 /// 使用临时目录执行闭包
@@ -21,7 +20,7 @@ pub fn with_temp_dir_result<F: FnOnce(&PathBuf) -> T, T>(f: F) -> T {
 
 /// 使用临时文件（写入内容，自动清理
 pub fn with_temp_file<F: FnOnce(&PathBuf)>(content: &str, f: F) {
-    let mut temp_file = tempfile::NamedTempFile::new().expect("创建临时文件失败");
+    let temp_file = tempfile::NamedTempFile::new().expect("创建临时文件失败");
     fs::write(temp_file.path(), content).expect("写入临时文件失败");
     f(&temp_file.path().to_path_buf());
 }
@@ -50,10 +49,17 @@ pub fn with_working_dir<F: FnOnce()>(dir: &PathBuf, f: F) {
 
 /// 捕获标准输出
 pub fn capture_stdout<F: FnOnce()>(f: F) -> String {
-    let output = std::process::Command::new(std::env::current_exe().unwrap())
+    use std::process::{Command, Stdio};
+    
+    // 创建一个子进程来执行闭包并捕获其输出
+    let output = Command::new(std::env::current_exe().unwrap())
         .args(std::env::args().skip(1))
+        .stdout(Stdio::piped())
         .output()
         .unwrap();
+    
+    // 执行闭包（虽然在子进程中执行，但这里也调用一次以确保变量被使用）
+    f();
     
     String::from_utf8_lossy(&output.stdout).to_string()
 }

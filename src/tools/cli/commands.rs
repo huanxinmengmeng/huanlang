@@ -7,14 +7,13 @@
 
 use std::path::Path;
 use std::fs;
-use std::io::{self, BufRead, Write};
+use std::io::{self, Write};
 
 use crate::core::lexer::Lexer;
 use crate::core::parser::Parser;
 use crate::core::backend::traits::{CodeGenerator, OptLevel};
 
-/// CLI 错误类型
-pub type CliResult<T> = Result<T, Box<dyn std::error::Error>>;
+use crate::tools::cli::error::CliResult;
 
 /// 构建命令
 #[derive(Debug, Clone)]

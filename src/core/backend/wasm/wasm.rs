@@ -8,8 +8,11 @@ use std::path::PathBuf;
 
 /// WASM 后端实现
 pub struct WasmBackend {
+    #[allow(dead_code)]
     target: TargetTriple,
+    #[allow(dead_code)]
     options: CodeGenOptions,
+    #[allow(dead_code)]
     wasm_options: WasmOptions,
 }
 
@@ -22,7 +25,7 @@ impl CodeGenerator for WasmBackend {
         }
     }
 
-    fn generate(&mut self, mlir_module: &ModuleOp) -> Result<Vec<u8>, CodeGenError> {
+    fn generate(&mut self, _mlir_module: &ModuleOp) -> Result<Vec<u8>, CodeGenError> {
         // 模拟生成 WASM 代码
         // 实际实现需要使用 WASM 工具链或 LLVM 生成 WASM 代码
         // 生成简单的 WASM 模块，包含魔数和基本结构
@@ -36,7 +39,7 @@ impl CodeGenerator for WasmBackend {
         Ok(wasm)
     }
 
-    fn emit_assembly(&mut self, mlir_module: &ModuleOp) -> Result<String, CodeGenError> {
+    fn emit_assembly(&mut self, _mlir_module: &ModuleOp) -> Result<String, CodeGenError> {
         Ok(String::from("(module
   (func $main (result i32)
     (i32.const 42)
@@ -46,7 +49,7 @@ impl CodeGenerator for WasmBackend {
 )\n"))
     }
 
-    fn link(&self, objects: Vec<PathBuf>, output: PathBuf) -> Result<(), LinkError> {
+    fn link(&self, _objects: Vec<PathBuf>, _output: PathBuf) -> Result<(), LinkError> {
         // 模拟链接过程
         // 实际实现需要使用 WASM 链接器
         Ok(())

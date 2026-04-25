@@ -7,7 +7,6 @@ use crossterm::{
 use std::io::{self, Write};
 use std::path::PathBuf;
 use unicode_segmentation::UnicodeSegmentation;
-use std::collections::VecDeque;
 
 use crate::tools::editor::buffer::TextBuffer;
 use crate::tools::editor::cursor::{CursorSet, Mode, clamp_column, clamp_line};
@@ -39,6 +38,7 @@ pub struct MacroAction {
 // LSP客户端状态
 #[derive(Debug, Clone, Default)]
 pub struct LspState {
+    #[allow(dead_code)]
     connected: bool,
     completions: Vec<String>,
     current_completion_index: Option<usize>,

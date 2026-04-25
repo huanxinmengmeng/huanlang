@@ -471,7 +471,7 @@ impl DeadCodeEliminationPass {
     }
     
     /// 检查操作是否是死代码
-    fn is_dead_code(&self, op: &Box<dyn HuanOp>) -> bool {
+    fn is_dead_code(&self, _op: &Box<dyn HuanOp>) -> bool {
         // 检查是否是不可达的代码
         // 例如：return语句后的代码
         // 这里简化处理，实际需要更复杂的分析
@@ -538,7 +538,7 @@ impl Pass for CommonSubexpressionEliminationPass {
         "cse"
     }
     
-    fn run(&mut self, ops: &mut Vec<Box<dyn HuanOp>>) -> Result<(), String> {
+    fn run(&mut self, _ops: &mut Vec<Box<dyn HuanOp>>) -> Result<(), String> {
         println!("Running common subexpression elimination pass...");
         // 这里实现公共子表达式消除
         Ok(())
@@ -560,7 +560,7 @@ impl Pass for LoopInvariantCodeMotionPass {
         "licm"
     }
     
-    fn run(&mut self, ops: &mut Vec<Box<dyn HuanOp>>) -> Result<(), String> {
+    fn run(&mut self, _ops: &mut Vec<Box<dyn HuanOp>>) -> Result<(), String> {
         println!("Running loop invariant code motion pass...");
         // 这里实现循环不变代码外提
         Ok(())
@@ -582,7 +582,7 @@ impl Pass for StrengthReductionPass {
         "strength-reduction"
     }
     
-    fn run(&mut self, ops: &mut Vec<Box<dyn HuanOp>>) -> Result<(), String> {
+    fn run(&mut self, _ops: &mut Vec<Box<dyn HuanOp>>) -> Result<(), String> {
         println!("Running strength reduction pass...");
         // 这里实现强度削减
         Ok(())

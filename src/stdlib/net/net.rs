@@ -7,13 +7,13 @@ use std::io::Read;
 use std::io::Write;
 use ureq;
 use urlencoding;
-use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use std::collections::VecDeque;
-use std::thread;
 use std::net::UdpSocket;
 use std::str;
+use base64::engine::general_purpose;
+use base64::Engine;
 
 /// 网络错误类型
 #[derive(Debug)]
@@ -1047,7 +1047,7 @@ impl WebSocket客户端 {
         for i in 0..16 {
             random[i] = rng.gen();
         }
-        base64::encode(random)
+        general_purpose::STANDARD.encode(random)
     }
     
     /// 构建WebSocket帧
@@ -1199,6 +1199,7 @@ impl WebSocket客户端 {
 /// FTP 客户端
 pub struct FTP客户端 {
     stream: TcpStream,
+    #[allow(dead_code)]
     data_stream: Option<TcpStream>,
     buffer: Vec<u8>,
 }
@@ -1528,6 +1529,7 @@ impl FTP客户端 {
 /// DNS 解析器
 pub struct DNS解析器 {
     udp_socket: UdpSocket,
+    #[allow(dead_code)]
     timeout: Duration,
 }
 

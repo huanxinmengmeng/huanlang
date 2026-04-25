@@ -132,18 +132,16 @@ impl<T: PropertyInput> PropertyRunner<T> {
     }
 
     /// 缩小失败案例
-    fn minimize_failure(&mut self, mut input: T, error_msg: String) {
+    fn minimize_failure(&mut self, input: T, _error_msg: String) {
         let mut current_input = input;
-        let mut current_error = error_msg;
         
         // 尝试通过简化输入来找到最小失败案例
         while let Some(simplified) = current_input.simplify() {
             let result = self.run_with_input(&simplified);
             match result {
-                PropertyResult::Failed(msg) => {
+                PropertyResult::Failed(_msg) => {
                     // 简化后的输入仍然失败，继续简化
                     current_input = simplified;
-                    current_error = msg;
                 }
                 _ => {
                     // 简化后的输入通过了测试，停止简化

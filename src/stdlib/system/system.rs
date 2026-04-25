@@ -3,15 +3,12 @@
 
 use std::env;
 use std::process;
-use std::ffi::CString;
-use std::os::raw::c_char;
 use libloading::{Library, Symbol};
 
 type Result<T> = std::result::Result<T, 系统错误>;
 use crate::stdlib::collections::字典;
 use crate::stdlib::collections::列表;
 use crate::stdlib::string::字符串;
-use crate::stdlib::io::路径;
 use crate::stdlib::io::系统错误;
 
 pub fn 获取环境变量(键: &str) -> Option<字符串> {
@@ -60,18 +57,18 @@ pub enum 选项类型 {
 }
 
 #[derive(Debug, Clone)]
-struct 选项定义 {
-    短名: Option<char>,
-    长名: String,
-    描述: String,
-    选项类型: 选项类型,
+pub struct 选项定义 {
+    pub 短名: Option<char>,
+    pub 长名: String,
+    pub 描述: String,
+    pub 选项类型: 选项类型,
 }
 
 #[derive(Debug, Clone)]
-struct 子命令定义 {
-    名称: String,
-    描述: String,
-    选项列表: Vec<选项定义>,
+pub struct 子命令定义 {
+    pub 名称: String,
+    pub 描述: String,
+    pub 选项列表: Vec<选项定义>,
 }
 
 pub struct 命令行解析器 {
@@ -149,9 +146,22 @@ impl 命令行解析器 {
             位置参数: Vec::new(),
         };
 
+        // 初始化默认值
+        for opt in &self.选项列表 {
+            if let 选项类型::选项 { 需要值: true, 默认值: Some(ref default) } = opt.选项类型 {
+                匹配.选项值.insert(opt.长名.clone(), default.clone());
+            }
+        }
+
         let mut i = 0;
         while i < args.len() {
             let arg = &args[i];
+
+            // 跳过第一个参数（程序名）
+            if i == 0 {
+                i += 1;
+                continue;
+            }
 
             if !arg.starts_with('-') && self.子命令列表.iter().any(|c| &c.名称 == arg) {
                 匹配.子命令 = Some(arg.clone());
@@ -428,7 +438,7 @@ impl 动态库 {
     }
 
     pub fn 卸载(&mut self) -> Result<()> {
-        drop(&mut self.library);
+        let _ = &mut self.library;
         Ok(())
     }
 

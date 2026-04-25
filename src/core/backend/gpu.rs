@@ -6,7 +6,7 @@ use super::traits::{CodeGenerator, CodeGenOptions};
 use super::target::TargetTriple;
 use super::error::{CodeGenError, LinkError};
 use crate::core::mlir;
-use crate::core::mlir::ops::{ModuleOp, HanshuOp, FanhuiOp, JiaOp, JianOp, ChengOp, ChuOp, IntLitOp, IdentOp};
+use crate::core::mlir::ops::{HanshuOp, FanhuiOp, JiaOp, JianOp, ChengOp, ChuOp, IntLitOp, IdentOp};
 
 /// GPU目标平台
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -20,6 +20,7 @@ pub enum GpuTarget {
 /// GPU后端实现
 pub struct GpuBackend {
     target: GpuTarget,
+    #[allow(dead_code)]
     options: CodeGenOptions,
 }
 
@@ -200,7 +201,7 @@ impl GpuBackend {
             code.push_str(&format!("    {} / {};", 
                 self.generate_opencl_expr(&div.lhs), 
                 self.generate_opencl_expr(&div.rhs)));
-        } else if let Some(ret) = op.as_any().downcast_ref::<FanhuiOp>() {
+        } else if let Some(_ret) = op.as_any().downcast_ref::<FanhuiOp>() {
             code.push_str("    return;");
         }
         

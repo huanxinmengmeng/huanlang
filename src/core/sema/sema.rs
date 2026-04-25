@@ -635,7 +635,7 @@ impl TypeInfer {
                 match t_target {
                     Type::List(inner) => Ok(*inner),
                     Type::Array(inner, _) => Ok(*inner),
-                    Type::Map(k, v) => Ok(*v),
+                    Type::Map(_k, v) => Ok(*v),
                     _ => Err(TypeError::NotIndexable {
                         ty: t_target,
                         span: *span,
@@ -643,7 +643,7 @@ impl TypeInfer {
                 }
             }
 
-            Expr::MethodCall { receiver, method, args, span } => {
+            Expr::MethodCall { receiver, method, args: _, span } => {
                 let t_receiver = self.infer_expr(receiver)?;
                 let method_name = &method.name;
                 return Err(TypeError::UndefinedMethod {
@@ -653,7 +653,7 @@ impl TypeInfer {
                 });
             }
 
-            Expr::Struct { path, fields, span } => {
+            Expr::Struct { path, fields, span: _ } => {
                 let _path = path;
                 let _fields = fields;
                 Ok(self.fresh_var())
@@ -668,7 +668,7 @@ impl TypeInfer {
             }
 
             Expr::Match { expr, arms, default, span } => {
-                let t_expr = self.infer_expr(expr)?;
+                let _t_expr = self.infer_expr(expr)?;
                 if arms.is_empty() {
                     if let Some(def) = default {
                         return self.infer_expr(def);
@@ -705,8 +705,6 @@ impl TypeInfer {
                 let _span = span;
                 Ok(self.fresh_var())
             }
-
-            _ => Ok(self.fresh_var()),
         }
     }
 
@@ -752,7 +750,7 @@ impl TypeInfer {
                 Ok(())
             }
 
-            Stmt::If { cond, then_block, else_ifs, else_block, span } => {
+            Stmt::If { cond, then_block, else_ifs, else_block, span: _ } => {
                 let t_cond = self.infer_expr(cond)?;
                 self.unify(t_cond, Type::Bool).map_err(|e| e.with_span(cond.span()))?;
 
@@ -817,8 +815,8 @@ impl TypeInfer {
                 Ok(())
             }
 
-            Stmt::Match { expr, arms, default, span } => {
-                let t_expr = self.infer_expr(expr)?;
+            Stmt::Match { expr, arms, default, span: _ } => {
+                let _t_expr = self.infer_expr(expr)?;
                 for (pattern, arm_stmts) in arms {
                     let _pattern = pattern;
                     for stmt in arm_stmts {
@@ -851,11 +849,11 @@ impl TypeInfer {
                 Ok(())
             }
 
-            Stmt::Break(span) => {
+            Stmt::Break(_span) => {
                 Ok(())
             }
 
-            Stmt::Continue(span) => {
+            Stmt::Continue(_span) => {
                 Ok(())
             }
 
@@ -864,7 +862,7 @@ impl TypeInfer {
                 Ok(())
             }
 
-            Stmt::Asm(_, span) => {
+            Stmt::Asm(_, _span) => {
                 Ok(())
             }
         }

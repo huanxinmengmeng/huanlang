@@ -13,8 +13,10 @@ use super::ast_to_llvm::{AstToLlvmCodeGen, validate_llvm_ir};
 
 pub struct LLVMBackend {
     target: TargetTriple,
+    #[allow(dead_code)]
     options: CodeGenOptions,
     symbols: HashMap<String, String>,
+    #[allow(dead_code)]
     string_constants: Vec<String>,
 }
 
@@ -134,7 +136,7 @@ impl LLVMBackend {
         ir.push_str("target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128\"\n");
         ir.push_str(&format!("target triple = \"{}\"\n\n", self.get_target_triple()));
 
-        for (i, op) in module.ops.iter().enumerate() {
+        for (_i, op) in module.ops.iter().enumerate() {
             if let Some(func) = op.as_any().downcast_ref::<HanshuOp>() {
                 ir.push_str("define ");
                 ir.push_str(&self.generate_function_header(func));

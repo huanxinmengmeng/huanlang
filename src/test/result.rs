@@ -52,7 +52,7 @@ impl TestResult {
         }
     }
 
-    pub fn ignored(test: Test, reason: Option<String>) -> Self {
+    pub fn ignored(test: Test, _reason: Option<String>) -> Self {
         TestResult {
             test,
             status: TestStatus::Ignored,

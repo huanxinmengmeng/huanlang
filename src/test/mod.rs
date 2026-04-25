@@ -59,8 +59,8 @@ pub fn main() -> ! {
     
     let mut runner = TestRunner::new(config);
     
-    let mut paths = vec![std::path::PathBuf::from("./")];
-    let count = runner.discover(&paths).unwrap_or(0);
+    let paths = vec![std::path::PathBuf::from("./")];
+    let _count = runner.discover(&paths).unwrap_or(0);
     
     let summary = runner.run();
     

@@ -15,6 +15,7 @@ pub struct TestRunner {
     /// 配置
     config: TestConfig,
     /// 测试模块
+    #[allow(dead_code)]
     modules: Vec<TestModule>,
     /// 测试注册表
     registry: TestRegistry,
@@ -170,7 +171,7 @@ impl TestRunner {
         
         for chunk in self.chunk_tests(tests) {
             let tx = tx.clone();
-            let running = Arc::clone(&running);
+            let _running = Arc::clone(&running);
             let tests = chunk.clone();
             let config = self.config.clone();
             
@@ -212,7 +213,7 @@ impl TestRunner {
     }
 
     /// 运行单个测试
-    fn run_single_test(&self, test: &Test, timeout: Option<Duration>) -> ResultItem {
+    fn run_single_test(&self, test: &Test, _timeout: Option<Duration>) -> ResultItem {
         let test = test.clone();
         
         let start = Instant::now();
@@ -305,7 +306,7 @@ impl TestRunner {
 
 type ResultItem = TestResult;
 
-fn run_single_internal(test: &Test, config: TestConfig) -> ResultItem {
+fn run_single_internal(test: &Test, _config: TestConfig) -> ResultItem {
     let start = Instant::now();
     let duration = start.elapsed();
     

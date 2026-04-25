@@ -40,7 +40,6 @@ impl Default for TestRegistry {
     }
 }
 
-/// 全局测试注册表（线程安全）
 lazy_static::lazy_static! {
     static ref GLOBAL_REGISTRY: Mutex<TestRegistry> = Mutex::new(TestRegistry::new());
 }

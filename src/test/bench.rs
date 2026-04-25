@@ -5,7 +5,6 @@
 
 use std::time::{Duration, Instant};
 use std::fmt;
-use std::cmp::Ordering;
 use serde::{Serialize, Deserialize};
 
 /// 基准测试配置
@@ -294,7 +293,7 @@ impl BenchmarkRunner {
         }
     }
 
-    pub fn compare_with_baseline(&self, baseline: &[BenchmarkStats]) -> Vec<PerformanceComparison> {
+    pub fn compare_with_baseline(&self, _baseline: &[BenchmarkStats]) -> Vec<PerformanceComparison> {
         // 这里实现比较逻辑
         Vec::new()
     }
