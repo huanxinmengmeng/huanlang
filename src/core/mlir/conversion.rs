@@ -316,6 +316,15 @@ impl AstToMlirConverter {
                             span: span.clone(),
                         }))
                     }
+                    BinaryOp::Mod => {
+                        let lhs = self.convert_expr(left)?;
+                        let rhs = self.convert_expr(right)?;
+                        Ok(Box::new(QuyuOp {
+                            lhs,
+                            rhs,
+                            span: span.clone(),
+                        }))
+                    }
                     BinaryOp::Gt => {
                         let lhs = self.convert_expr(left)?;
                         let rhs = self.convert_expr(right)?;
@@ -334,7 +343,34 @@ impl AstToMlirConverter {
                             span: span.clone(),
                         }))
                     }
+                    BinaryOp::Ge => {
+                        let lhs = self.convert_expr(left)?;
+                        let rhs = self.convert_expr(right)?;
+                        Ok(Box::new(DayuOp {
+                            lhs,
+                            rhs,
+                            span: span.clone(),
+                        }))
+                    }
+                    BinaryOp::Le => {
+                        let lhs = self.convert_expr(left)?;
+                        let rhs = self.convert_expr(right)?;
+                        Ok(Box::new(XiaoyuOp {
+                            lhs,
+                            rhs,
+                            span: span.clone(),
+                        }))
+                    }
                     BinaryOp::Eq => {
+                        let lhs = self.convert_expr(left)?;
+                        let rhs = self.convert_expr(right)?;
+                        Ok(Box::new(DengyuOp {
+                            lhs,
+                            rhs,
+                            span: span.clone(),
+                        }))
+                    }
+                    BinaryOp::Ne => {
                         let lhs = self.convert_expr(left)?;
                         let rhs = self.convert_expr(right)?;
                         Ok(Box::new(DengyuOp {
@@ -373,7 +409,25 @@ impl AstToMlirConverter {
                             span: span.clone(),
                         }))
                     }
-                    _ => Err(ConversionError::ExprError(format!("Unsupported unary op {:?}", op))),
+                    UnaryOp::Neg => {
+                        let zero = Box::new(IntLitOp {
+                            value: 0,
+                            span: span.clone(),
+                        });
+                        let operand = self.convert_expr(expr)?;
+                        Ok(Box::new(JianOp {
+                            lhs: zero,
+                            rhs: operand,
+                            span: span.clone(),
+                        }))
+                    }
+                    UnaryOp::BitNot => {
+                        let operand = self.convert_expr(expr)?;
+                        Ok(Box::new(FeiOp {
+                            operand,
+                            span: span.clone(),
+                        }))
+                    }
                 }
             }
             Expr::Call { func, args, span } => {
@@ -407,6 +461,58 @@ impl AstToMlirConverter {
                 Ok(Box::new(SuoyinOp {
                     container,
                     index,
+                    span: span.clone(),
+                }))
+            }
+            Expr::Field { target, field, span } => {
+                let obj = self.convert_expr(target)?;
+                Ok(Box::new(ZiduanOp {
+                    object: obj,
+                    field: field.name.clone(),
+                    span: span.clone(),
+                }))
+            }
+            Expr::Map(pairs, span) => {
+                let mut keys = Vec::new();
+                let mut values = Vec::new();
+                for (k, v) in pairs {
+                    keys.push(self.convert_expr(k)?);
+                    values.push(self.convert_expr(v)?);
+                }
+                Ok(Box::new(ZidianOp {
+                    keys,
+                    values,
+                    span: span.clone(),
+                }))
+            }
+            Expr::IfExpr { cond, then_expr, else_expr, span } => {
+                let condition = self.convert_expr(cond)?;
+                let then_block_ops = vec![self.convert_expr(then_expr)?];
+                let else_block_ops = vec![self.convert_expr(else_expr)?];
+                Ok(Box::new(RuoOp {
+                    condition,
+                    then_block: then_block_ops,
+                    else_block: Some(else_block_ops),
+                    span: span.clone(),
+                }))
+            }
+            Expr::Match { expr, arms, default, span } => {
+                let value = self.convert_expr(expr)?;
+                let mut mlir_arms = Vec::new();
+                for (pattern, arm_expr) in arms {
+                    let _pattern = pattern;
+                    let arm_ops = vec![self.convert_expr(arm_expr)?];
+                    mlir_arms.push((Box::new(IntLitOp { value: 0, span: SourceSpan::default() }) as Box<dyn HuanOp>, arm_ops));
+                }
+                let default_arm = if let Some(def_expr) = default {
+                    Some(vec![self.convert_expr(def_expr)?])
+                } else {
+                    None
+                };
+                Ok(Box::new(PipeiOp {
+                    value,
+                    arms: mlir_arms,
+                    default_arm,
                     span: span.clone(),
                 }))
             }

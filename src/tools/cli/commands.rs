@@ -39,6 +39,12 @@ pub struct FormatCommand {
     pub write: bool,
 }
 
+/// 检查命令
+#[derive(Debug, Clone)]
+pub struct CheckCommand {
+    pub input: String,
+}
+
 /// 编辑命令
 #[derive(Debug, Clone)]
 pub struct EditCommand {
@@ -71,6 +77,12 @@ impl FormatCommand {
             check: false,
             write: false,
         }
+    }
+}
+
+impl CheckCommand {
+    pub fn new(input: String) -> Self {
+        Self { input }
     }
 }
 
@@ -323,6 +335,91 @@ pub fn execute_fmt(cmd: FormatCommand) -> CliResult<()> {
     Ok(())
 }
 
+/// 执行类型检查命令
+pub fn execute_check(cmd: CheckCommand) -> CliResult<()> {
+    if cmd.input.is_empty() {
+        println!("错误: 请指定要检查的源文件");
+        println!("用法: huan check <源文件>");
+        return Ok(());
+    }
+
+    let input_path = Path::new(&cmd.input);
+    if !input_path.exists() {
+        println!("错误: 文件不存在: {}", cmd.input);
+        return Ok(());
+    }
+
+    println!("正在检查: {}", cmd.input);
+
+    let source = match fs::read_to_string(&cmd.input) {
+        Ok(s) => s,
+        Err(e) => {
+            println!("错误: 无法读取文件: {}", e);
+            return Ok(());
+        }
+    };
+
+    let mut lexer = Lexer::new(&source);
+    let (tokens, lex_errors) = lexer.tokenize();
+
+    if !lex_errors.is_empty() {
+        println!("词法分析错误:");
+        for err in lex_errors {
+            println!("  {:?}", err);
+        }
+        return Ok(());
+    }
+
+    let mut parser = Parser::new(tokens);
+    match parser.parse() {
+        Ok(ast) => {
+            println!("语法分析完成");
+            println!("解析了 {} 个顶层定义", ast.len());
+
+            let mut analyzer = crate::core::sema::SemanticAnalyzer::new();
+            match analyzer.analyze(&ast) {
+                Ok(_) => {
+                    println!("类型检查通过!");
+                    println!("✓ 词法分析正确");
+                    println!("✓ 语法分析正确");
+                    println!("✓ 语义分析正确");
+                }
+                Err(errors) => {
+                    println!("类型检查错误:");
+                    for error in errors {
+                        match error {
+                            crate::core::sema::SemanticError::TypeError(type_err) => {
+                                println!("  类型错误: {:?}", type_err);
+                            }
+                            crate::core::sema::SemanticError::DuplicateDefinition { name, first, second } => {
+                                println!("  重复定义错误: '{}' 在 {:?} 和 {:?}", name, first, second);
+                            }
+                            crate::core::sema::SemanticError::InvalidAssignment { target, span } => {
+                                println!("  无效赋值: 目标 '{}' 在 {:?}", target, span);
+                            }
+                            crate::core::sema::SemanticError::BreakOutsideLoop(span) => {
+                                println!("  break 语句在循环外: {:?}", span);
+                            }
+                            crate::core::sema::SemanticError::ContinueOutsideLoop(span) => {
+                                println!("  continue 语句在循环外: {:?}", span);
+                            }
+                            crate::core::sema::SemanticError::ReturnOutsideFunction { span } => {
+                                println!("  return 语句在函数外: {:?}", span);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            println!("语法错误:");
+            println!("  {:?}", e);
+        }
+    }
+
+    Ok(())
+}
+
 /// 执行编辑命令
 pub fn execute_edit(cmd: EditCommand) -> CliResult<()> {
     use std::path::PathBuf;
@@ -560,6 +657,7 @@ impl Cli {
             println!("");
             println!("可用命令:");
             println!("  build <文件>   编译源文件");
+            println!("  check <文件>   类型检查源文件");
             println!("  run <文件>     运行源文件");
             println!("  repl           启动交互式环境");
             println!("  fmt <文件>     格式化代码");
@@ -581,6 +679,17 @@ impl Cli {
                     }
                 }
                 if let Err(e) = execute_build(cmd) {
+                    eprintln!("错误: {}", e);
+                }
+            }
+            "check" => {
+                let mut cmd = CheckCommand::new(String::new());
+                for i in 2..args.len() {
+                    if !args[i].starts_with('-') && cmd.input.is_empty() {
+                        cmd.input = args[i].clone();
+                    }
+                }
+                if let Err(e) = execute_check(cmd) {
                     eprintln!("错误: {}", e);
                 }
             }

@@ -165,14 +165,11 @@ impl Parser {
                 self.advance();
                 continue;
             }
-            eprintln!("DEBUG parse: current token: {:?}", self.current());
             match self.parse_item() {
                 Ok(item) => {
-                    eprintln!("DEBUG parse: parsed item: {:?}", item);
                     items.push(item);
                 }
                 Err(e) => {
-                    eprintln!("DEBUG parse: parse_item error: {:?}", e);
                     self.errors.push(e.clone());
                     if matches!(e, ParseError::UnexpectedEof { .. }) {
                         if !items.is_empty() {
@@ -833,7 +830,61 @@ impl Parser {
             lhs = self.parse_infix(lhs, prec)?;
         }
 
+        lhs = self.parse_postfix(lhs)?;
         Ok(lhs)
+    }
+
+    fn parse_postfix(&mut self, mut expr: Expr) -> Result<Expr, ParseError> {
+        loop {
+            match self.current() {
+                Some(tok) => {
+                    match tok.kind {
+                        TokenKind::Dot => {
+                            self.advance();
+                            let field_tok = self.expect_ident("field name")?;
+                            let field = Ident::new(field_tok.lexeme.clone(), field_tok.span);
+                            let span = expr.span().merge(field_tok.span);
+                            expr = Expr::Field {
+                                target: Box::new(expr),
+                                field,
+                                span,
+                            };
+                        }
+                        TokenKind::LBracket => {
+                            self.advance();
+                            let index = self.parse_expr()?;
+                            self.expect(TokenKind::RBracket, "]")?;
+                            let span = expr.span().merge(self.current_span());
+                            expr = Expr::Index {
+                                target: Box::new(expr),
+                                index: Box::new(index),
+                                span,
+                            };
+                        }
+                        TokenKind::LParen => {
+                            self.advance();
+                            let mut args = Vec::new();
+                            while !self.check(TokenKind::RParen) && !self.is_eof() {
+                                args.push(self.parse_expr()?);
+                                if self.eat(TokenKind::Comma).is_none() {
+                                    break;
+                                }
+                            }
+                            let span = expr.span().merge(self.current_span());
+                            self.expect(TokenKind::RParen, ")")?;
+                            expr = Expr::Call {
+                                func: Box::new(expr),
+                                args,
+                                span,
+                            };
+                        }
+                        _ => break,
+                    }
+                }
+                None => break,
+            }
+        }
+        Ok(expr)
     }
 
     fn is_infix_operator(&self, kind: &TokenKind) -> bool {
@@ -851,7 +902,6 @@ impl Parser {
             | TokenKind::Shl | TokenKind::Shr
             | TokenKind::Plus | TokenKind::Minus | TokenKind::Add | TokenKind::Sub
             | TokenKind::Star | TokenKind::Slash | TokenKind::Percent | TokenKind::Mul | TokenKind::Div | TokenKind::Mod
-            | TokenKind::LParen | TokenKind::LBracket | TokenKind::Dot
         )
     }
 
@@ -870,7 +920,6 @@ impl Parser {
             TokenKind::Assign
                 | TokenKind::PlusEq | TokenKind::MinusEq | TokenKind::StarEq
                 | TokenKind::SlashEq | TokenKind::PercentEq => PREC_ASSIGN,
-            TokenKind::LParen | TokenKind::LBracket | TokenKind::Dot => PREC_CALL,
             _ => PREC_LOWEST,
         }
     }

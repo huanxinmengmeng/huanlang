@@ -615,6 +615,97 @@ impl TypeInfer {
                 Ok(Type::Unit)
             }
 
+            Expr::Field { target, field, span } => {
+                let t_target = self.infer_expr(target)?;
+                let field_name = &field.name;
+                if let Type::Named(_) = &t_target {
+                    return Err(TypeError::UndefinedField {
+                        ty: t_target,
+                        field: field_name.clone(),
+                        span: *span,
+                    });
+                }
+                Ok(self.fresh_var())
+            }
+
+            Expr::Index { target, index, span } => {
+                let t_target = self.infer_expr(target)?;
+                let t_index = self.infer_expr(index)?;
+                self.unify(t_index, Type::Int).map_err(|e| e.with_span(*span))?;
+                match t_target {
+                    Type::List(inner) => Ok(*inner),
+                    Type::Array(inner, _) => Ok(*inner),
+                    Type::Map(k, v) => Ok(*v),
+                    _ => Err(TypeError::NotIndexable {
+                        ty: t_target,
+                        span: *span,
+                    }),
+                }
+            }
+
+            Expr::MethodCall { receiver, method, args, span } => {
+                let t_receiver = self.infer_expr(receiver)?;
+                let method_name = &method.name;
+                return Err(TypeError::UndefinedMethod {
+                    ty: t_receiver,
+                    method: method_name.clone(),
+                    span: *span,
+                });
+            }
+
+            Expr::Struct { path, fields, span } => {
+                let _path = path;
+                let _fields = fields;
+                Ok(self.fresh_var())
+            }
+
+            Expr::Closure { params, return_type, body, span } => {
+                let _params = params;
+                let _return_type = return_type;
+                let _body = body;
+                let _span = span;
+                Ok(self.fresh_var())
+            }
+
+            Expr::Match { expr, arms, default, span } => {
+                let t_expr = self.infer_expr(expr)?;
+                if arms.is_empty() {
+                    if let Some(def) = default {
+                        return self.infer_expr(def);
+                    }
+                    return Ok(self.fresh_var());
+                }
+                let first_arm_ty = self.fresh_var();
+                for (pattern, arm_expr) in arms {
+                    let _pattern = pattern;
+                    let t_arm = self.infer_expr(arm_expr)?;
+                    self.unify(first_arm_ty.clone(), t_arm).map_err(|e| e.with_span(*span))?;
+                }
+                if let Some(def) = default {
+                    let t_def = self.infer_expr(def)?;
+                    self.unify(first_arm_ty.clone(), t_def).map_err(|e| e.with_span(*span))?;
+                }
+                Ok(first_arm_ty)
+            }
+
+            Expr::Try { expr, span } => {
+                let t_expr = self.infer_expr(expr)?;
+                match t_expr {
+                    Type::Option(inner) => Ok(*inner),
+                    _ => Err(TypeError::InvalidTry {
+                        ty: t_expr,
+                        span: *span,
+                    }),
+                }
+            }
+
+            Expr::TypeAssertion { expr, ty, span } => {
+                let _t_expr = self.infer_expr(expr)?;
+                let _ty = ty;
+                let _span = span;
+                Ok(self.fresh_var())
+            }
+
             _ => Ok(self.fresh_var()),
         }
     }
@@ -654,6 +745,94 @@ impl TypeInfer {
                 Ok(())
             }
 
+            Stmt::Assign { target, value, span } => {
+                let t_target = self.infer_expr(target)?;
+                let t_value = self.infer_expr(value)?;
+                self.unify(t_target, t_value).map_err(|e| e.with_span(*span))?;
+                Ok(())
+            }
+
+            Stmt::If { cond, then_block, else_ifs, else_block, span } => {
+                let t_cond = self.infer_expr(cond)?;
+                self.unify(t_cond, Type::Bool).map_err(|e| e.with_span(cond.span()))?;
+
+                for stmt in then_block {
+                    self.infer_stmt(stmt)?;
+                }
+
+                for (elif_cond, elif_block) in else_ifs {
+                    let t_elif_cond = self.infer_expr(elif_cond)?;
+                    self.unify(t_elif_cond, Type::Bool).map_err(|e| e.with_span(elif_cond.span()))?;
+                    for stmt in elif_block {
+                        self.infer_stmt(stmt)?;
+                    }
+                }
+
+                if let Some(else_block) = else_block {
+                    for stmt in else_block {
+                        self.infer_stmt(stmt)?;
+                    }
+                }
+
+                Ok(())
+            }
+
+            Stmt::While { cond, body, span } => {
+                let t_cond = self.infer_expr(cond)?;
+                self.unify(t_cond, Type::Bool).map_err(|e| e.with_span(*span))?;
+                for stmt in body {
+                    self.infer_stmt(stmt)?;
+                }
+                Ok(())
+            }
+
+            Stmt::Repeat { count, body, span } => {
+                let t_count = self.infer_expr(count)?;
+                self.unify(t_count, Type::Int).map_err(|e| e.with_span(*span))?;
+                for stmt in body {
+                    self.infer_stmt(stmt)?;
+                }
+                Ok(())
+            }
+
+            Stmt::ForEach { var, iterable, body, span } => {
+                let t_iter = self.infer_expr(iterable)?;
+                match &t_iter {
+                    Type::List(inner) => {
+                        self.env.last_mut().unwrap().insert(var.name.clone(), *inner.clone());
+                    }
+                    Type::Array(inner, _) => {
+                        self.env.last_mut().unwrap().insert(var.name.clone(), *inner.clone());
+                    }
+                    _ => {
+                        return Err(TypeError::NotIterable {
+                            ty: t_iter,
+                            span: *span,
+                        });
+                    }
+                }
+                for stmt in body {
+                    self.infer_stmt(stmt)?;
+                }
+                Ok(())
+            }
+
+            Stmt::Match { expr, arms, default, span } => {
+                let t_expr = self.infer_expr(expr)?;
+                for (pattern, arm_stmts) in arms {
+                    let _pattern = pattern;
+                    for stmt in arm_stmts {
+                        self.infer_stmt(stmt)?;
+                    }
+                }
+                if let Some(default_stmts) = default {
+                    for stmt in default_stmts {
+                        self.infer_stmt(stmt)?;
+                    }
+                }
+                Ok(())
+            }
+
             Stmt::Return(expr, span) => {
                 if let Some(expected) = self.current_return_type.clone() {
                     if let Some(e) = expr {
@@ -672,12 +851,22 @@ impl TypeInfer {
                 Ok(())
             }
 
+            Stmt::Break(span) => {
+                Ok(())
+            }
+
+            Stmt::Continue(span) => {
+                Ok(())
+            }
+
             Stmt::Expr(expr, _) => {
                 self.infer_expr(expr)?;
                 Ok(())
             }
 
-            _ => Ok(()),
+            Stmt::Asm(_, span) => {
+                Ok(())
+            }
         }
     }
 

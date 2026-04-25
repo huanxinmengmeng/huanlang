@@ -12,6 +12,7 @@ pub mod random;
 pub mod crypto;
 pub mod serialize;
 pub mod net;
+pub mod console;
 
 pub mod prelude {
     pub use super::core::*;
@@ -19,4 +20,5 @@ pub mod prelude {
     pub use super::collections::*;
     pub use super::string::*;
     pub use super::math::*;
+    pub use super::console::*;
 }
