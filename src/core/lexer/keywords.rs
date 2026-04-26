@@ -1,5 +1,14 @@
-// Copyright © 2026 幻心梦梦（huanxinmengmeng）
-// 本项目依据项目根目录的 LICENSE 文件中的幻语许可证进行许可。
+// Copyright © 2026 幻心梦梦 (huanxinmengmeng)
+// Licensed under the Apache License, Version 2.0 (the "License");
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 //! 三语关键词系统 - 支持中文、拼音和英文关键词的完整实现
 //!
@@ -33,14 +42,17 @@ pub struct KeywordTable {
 const KEYWORD_TRIPLES: &[(&str, &str, &str, TokenKind)] = &[
     // 控制流与声明关键词
     ("令", "ling", "let", TokenKind::Let),
+    ("变量", "bianliang", "let", TokenKind::Let),
     ("定", "ding", "const", TokenKind::Const),
     ("为", "wei", "be", TokenKind::Be),
     ("类型", "leixing", "type", TokenKind::TypeAnno),
     ("若", "ruo", "if", TokenKind::If),
+    ("如果", "ruguo", "if", TokenKind::If),
     ("则", "ze", "then", TokenKind::Then),
     ("否则", "fouze", "else", TokenKind::Else),
     ("结束", "jieshu", "end", TokenKind::End),
     ("当", "dang", "while", TokenKind::While),
+    ("循环", "xunhuan", "while", TokenKind::While),
     ("重复", "chongfu", "repeat", TokenKind::Repeat),
     ("次", "ci", "times", TokenKind::Times),
     ("对于", "duiyu", "for", TokenKind::For),
@@ -99,6 +111,9 @@ const KEYWORD_TRIPLES: &[(&str, &str, &str, TokenKind)] = &[
     ("全局", "quanju", "global", TokenKind::Global),
     ("段", "duan", "section", TokenKind::Section),
     ("对齐", "duiqi", "align", TokenKind::Align),
+    ("外部", "waibu", "extern", TokenKind::Extern),
+    ("类型", "leixing", "type", TokenKind::Type),
+    ("可变", "kebian", "mut", TokenKind::Mut),
     
     // 类型关键词
     ("整数", "zhengshu", "int", TokenKind::TypeInt),
@@ -281,6 +296,9 @@ impl KeywordStyleConverter {
                 | TokenKind::Global
                 | TokenKind::Section
                 | TokenKind::Align
+                | TokenKind::Extern
+                | TokenKind::Type
+                | TokenKind::Mut
                 | TokenKind::TypeInt
                 | TokenKind::TypeI8
                 | TokenKind::TypeI16

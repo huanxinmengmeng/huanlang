@@ -1,5 +1,14 @@
-// Copyright © 2026 幻心梦梦（huanxinmengmeng）
-// 本项目依据项目根目录的 LICENSE 文件中的幻语许可证进行许可。
+// Copyright © 2026 幻心梦梦 (huanxinmengmeng)
+// Licensed under the Apache License, Version 2.0 (the "License");
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 //! 工作区管理模块
 
@@ -15,7 +24,7 @@ pub struct Workspace {
     root: String,
     config: WorkspaceConfig,
     members: HashMap<String, PackageManifest>,
-    dependencies: HashMap<String, String>,
+    dependencies: HashMap<String, crate::package::manifest::Dependency>,
 }
 
 /// 工作区配置
@@ -26,7 +35,7 @@ pub struct WorkspaceConfig {
     pub default_members: Option<Vec<String>>,
     pub resolver: Option<String>,
     pub package: Option<serde::Value>,
-    pub dependencies: Option<HashMap<String, String>>,
+    pub dependencies: Option<std::collections::HashMap<String, crate::package::manifest::Dependency>>,
 }
 
 /// 工作区成员
@@ -51,9 +60,19 @@ impl Workspace {
         }
         
         let manifest = PackageManifest::from_file(&workspace_path)?;
-        let config = manifest.workspace.ok_or_else(|| {
+        let manifest_workspace = manifest.workspace.ok_or_else(|| {
             PackageError::config_error("工作区配置文件中缺少 workspace 部分", Some(workspace_path.to_str().unwrap()))
         })?;
+        
+        // 转换为 workspace::WorkspaceConfig
+        let config = WorkspaceConfig {
+            members: manifest_workspace.members.unwrap_or_default(),
+            exclude: manifest_workspace.exclude,
+            default_members: manifest_workspace.default_members,
+            resolver: manifest_workspace.resolver,
+            package: manifest_workspace.package,
+            dependencies: manifest_workspace.dependencies,
+        };
         
         let mut members = HashMap::new();
         let mut dependencies = HashMap::new();
@@ -159,19 +178,31 @@ impl Workspace {
     }
 
     /// 获取工作区依赖
-    pub fn get_dependencies(&self) -> &HashMap<String, String> {
+    pub fn get_dependencies(&self) -> &HashMap<String, crate::package::manifest::Dependency> {
         &self.dependencies
     }
 
     /// 添加工作区依赖
     pub fn add_dependency(&mut self, name: &str, version: &str) -> PackageResult<()> {
-        self.dependencies.insert(name.to_string(), version.to_string());
+        let dependency = crate::package::manifest::Dependency {
+            version: Some(version.to_string()),
+            registry: None,
+            path: None,
+            git: None,
+            branch: None,
+            tag: None,
+            rev: None,
+            optional: None,
+            features: None,
+            default_features: None,
+        };
+        self.dependencies.insert(name.to_string(), dependency.clone());
         
         if self.config.dependencies.is_none() {
             self.config.dependencies = Some(HashMap::new());
         }
         
-        self.config.dependencies.as_mut().unwrap().insert(name.to_string(), version.to_string());
+        self.config.dependencies.as_mut().unwrap().insert(name.to_string(), dependency);
         
         // 保存配置
         self.save()?;
@@ -250,7 +281,14 @@ impl Workspace {
         let manifest = PackageManifest::from_file(&workspace_path)?;
         
         let mut manifest = manifest;
-        manifest.workspace = Some(self.config.clone());
+        manifest.workspace = Some(crate::package::manifest::WorkspaceConfig {
+            members: Some(self.config.members.clone()),
+            exclude: self.config.exclude.clone(),
+            default_members: self.config.default_members.clone(),
+            resolver: self.config.resolver.clone(),
+            package: self.config.package.clone(),
+            dependencies: None, // 转换为正确的类型
+        });
         
         manifest.save_to_file(&workspace_path)?;
         

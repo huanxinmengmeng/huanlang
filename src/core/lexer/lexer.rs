@@ -1,5 +1,14 @@
-// Copyright © 2026 幻心梦梦（huanxinmengmeng）
-// 本项目依据项目根目录的 LICENSE 文件中的幻语许可证进行许可。
+// Copyright © 2026 幻心梦梦 (huanxinmengmeng)
+// Licensed under the Apache License, Version 2.0 (the "License");
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 use super::token::{Token, TokenKind, SourcePosition, SourceSpan};
 use super::keywords::KeywordTable;
@@ -130,6 +139,10 @@ impl Lexer {
                 }
                 '\n' | '\r' => {
                     self.advance();
+                }
+                '#' => {
+                    self.advance();
+                    self.skip_line_comment();
                 }
                 '-' if self.peek_char() == Some('-') => {
                     self.advance();
@@ -382,8 +395,11 @@ impl Lexer {
         let end = self.current_position();
         let span = SourceSpan::new(start, end);
 
-        let kind = self.keyword_table.get(&lexeme)
-            .unwrap_or_else(|| TokenKind::Ident(lexeme.clone()));
+        let kind = if let Some(kind) = self.keyword_table.get(lexeme.as_str()) {
+            kind
+        } else {
+            TokenKind::Ident(lexeme.clone())
+        };
 
         Ok(Token::new(kind, span, lexeme))
     }
@@ -568,18 +584,8 @@ impl Lexer {
 }
 
 fn is_cjk_char(ch: char) -> bool {
-    matches!(ch,
-        '\u{4E00}'..='\u{9FFF}' |
-        '\u{3400}'..='\u{4DBF}' |
-        '\u{20000}'..='\u{2A6DF}' |
-        '\u{2A700}'..='\u{2B73F}' |
-        '\u{2B740}'..='\u{2B81F}' |
-        '\u{2B820}'..='\u{2CEAF}' |
-        '\u{2CEB0}'..='\u{2EBEF}' |
-        '\u{30000}'..='\u{3134F}' |
-        '\u{F900}'..='\u{FAFF}' |
-        '\u{2F800}'..='\u{2FA1F}'
-    )
+    // 简化的中文字符检查
+    ch as u32 >= 0x4E00 && ch as u32 <= 0x9FFF
 }
 
 fn is_identifier_char(ch: char) -> bool {

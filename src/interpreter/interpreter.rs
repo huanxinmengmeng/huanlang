@@ -1,9 +1,19 @@
-// Copyright © 2026 幻心梦梦（huanxinmengmeng）
-// 本项目依据项目根目录的 LICENSE 文件中的幻语许可证进行许可。
+// Copyright © 2026 幻心梦梦 (huanxinmengmeng)
+// Licensed under the Apache License, Version 2.0 (the "License");
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 use crate::core::ast::*;
 use crate::core::lexer::Lexer;
 use crate::core::parser::Parser;
+use crate::core::sema::SemanticAnalyzer;
 use super::env::Environment;
 use super::value::Value;
 
@@ -29,19 +39,46 @@ impl Interpreter {
         let mut parser = Parser::new(tokens);
         let ast = parser.parse().map_err(|e| format!("语法错误: {:?}", e))?;
 
+        // 进行语义分析
+        let mut analyzer = SemanticAnalyzer::new();
+        match analyzer.analyze(&ast) {
+            Ok(_symbol_table) => {
+                // 语义分析成功，继续执行
+            }
+            Err(errors) => {
+                let error_messages: Vec<String> = errors.into_iter().map(|e| format!("语义错误: {:?}", e)).collect();
+                return Err(error_messages.join("\n"));
+            }
+        }
+
         self.run_program(&ast)
     }
 
     pub fn run_program(&mut self, program: &Program) -> Result<Value, String> {
-        for item in program {
+        // 确保设置标准库
+        self.setup_stdlib();
+        
+        println!("DEBUG: 程序包含 {} 个顶层定义", program.len());
+        for (i, item) in program.iter().enumerate() {
+            println!("DEBUG: 处理顶层定义 {}: {:?}", i, item);
             self.execute_item(item)?;
         }
 
+        println!("DEBUG: 环境中的函数: {:?}", self.env.functions.keys());
+        
         if let Some(main_func) = self.env.get_function("主").cloned() {
+            println!("DEBUG: 找到中文主函数");
             let args: Vec<Value> = vec![];
             return self.execute_function_body(&main_func.body, args);
         }
 
+        if let Some(main_func) = self.env.get_function("main").cloned() {
+            println!("DEBUG: 找到英文主函数");
+            let args: Vec<Value> = vec![];
+            return self.execute_function_body(&main_func.body, args);
+        }
+
+        println!("DEBUG: 未找到主函数");
         Ok(Value::Unit)
     }
 
@@ -80,14 +117,7 @@ impl Interpreter {
     }
 
     fn setup_stdlib(&mut self) {
-        if !self.env.functions.contains_key("显示") {
-            let print_func = super::env::FunctionDef {
-                params: vec!["消息".to_string()],
-                body: vec![],
-            };
-            self.env.set_function("显示".to_string(), print_func.clone());
-            self.env.set_function("打印".to_string(), print_func);
-        }
+        // 内置函数不需要添加到环境中，直接在 eval_builtin_function 中处理
     }
 
     fn execute_function_body(&mut self, body: &Vec<Stmt>, _args: Vec<Value>) -> Result<Value, String> {
@@ -166,6 +196,39 @@ impl Interpreter {
                         result = self.execute_stmt(stmt)?;
                     }
                     return Ok(result);
+                }
+                Ok(Value::Unit)
+            }
+            Stmt::If { cond, then_block, else_ifs, else_block, .. } => {
+                if self.eval_as_bool(cond)? {
+                    let mut result = Value::Unit;
+                    for stmt in then_block {
+                        result = self.execute_stmt(stmt)?;
+                    }
+                    return Ok(result);
+                }
+                for (else_if_cond, else_if_block) in else_ifs {
+                    if self.eval_as_bool(else_if_cond)? {
+                        let mut result = Value::Unit;
+                        for stmt in else_if_block {
+                            result = self.execute_stmt(stmt)?;
+                        }
+                        return Ok(result);
+                    }
+                }
+                if let Some(else_block) = else_block {
+                    let mut result = Value::Unit;
+                    for stmt in else_block {
+                        result = self.execute_stmt(stmt)?;
+                    }
+                    return Ok(result);
+                }
+                Ok(Value::Unit)
+            }
+            Stmt::Assign { target, value, .. } => {
+                let value = self.evaluate_expr(value)?;
+                if let Expr::Ident(ident) = target.as_ref() {
+                    self.env.set_var(ident.name.clone(), value);
                 }
                 Ok(Value::Unit)
             }
@@ -296,22 +359,81 @@ impl Interpreter {
             _ => return Err("仅支持直接函数调用".to_string()),
         };
 
+        println!("DEBUG: 调用函数: {}", func_name);
+        
         let evaluated_args: Result<Vec<Value>, String> = args.iter().map(|arg| self.evaluate_expr(arg)).collect();
         let evaluated_args = evaluated_args?;
 
-        match func_name.as_str() {
-            "显示" | "打印" => {
-                for arg in &evaluated_args {
-                    print!("{}", arg.to_string());
+        // 检查是否是内置函数（优先）
+        println!("DEBUG: 检查内置函数");
+        if let Some(result) = self.eval_builtin_function(&func_name, &evaluated_args) {
+            println!("DEBUG: 调用内置函数成功");
+            return result;
+        }
+        
+        // 检查是否是用户定义的函数
+        println!("DEBUG: 检查用户定义函数");
+        if let Some(func_def) = self.env.get_function(&func_name).cloned() {
+            println!("DEBUG: 调用用户定义函数成功");
+            return self.execute_function_body(&func_def.body, evaluated_args);
+        }
+        
+        println!("DEBUG: 未找到函数: {}", func_name);
+        Err(format!("未找到函数: {}", func_name))
+    }
+    
+    fn eval_builtin_function(&mut self, func_name: &str, args: &[Value]) -> Option<Result<Value, String>> {
+        match func_name {
+            "显示" | "打印" | "print" | "显示行" | "xianshi" | "dayin" | "xianshihang" => {
+                use std::io::{self, Write};
+                
+                println!("DEBUG: 调用内置函数: {}", func_name);
+                println!("DEBUG: 参数数量: {}", args.len());
+                for (i, arg) in args.iter().enumerate() {
+                    println!("DEBUG: 参数 {}: {:?}", i, arg);
                 }
-                println!();
-                Ok(Value::Unit)
+                
+                if args.is_empty() {
+                    println!();
+                    io::stdout().flush().unwrap();
+                    return Some(Ok(Value::Unit));
+                }
+                
+                if args.len() == 1 {
+                    // 单个参数，直接输出
+                    println!("{}", args[0].to_string());
+                    io::stdout().flush().unwrap();
+                    return Some(Ok(Value::Unit));
+                }
+                
+                // 多个参数，第一个参数作为格式化字符串
+                if let Value::String(format_str) = &args[0] {
+                    let mut result = format_str.clone();
+                    for (i, arg) in args.iter().skip(1).enumerate() {
+                        let placeholder = format!("{{{}}}", i);
+                        result = result.replace(&placeholder, &arg.to_string());
+                        // 同时替换 {} 占位符
+                        if let Some(pos) = result.find("{}") {
+                            result.replace_range(pos..pos+2, &arg.to_string());
+                        }
+                    }
+                    println!("{}", result);
+                    io::stdout().flush().unwrap();
+                } else {
+                    // 第一个参数不是字符串，直接输出所有参数
+                    for arg in args {
+                        print!("{}", arg.to_string());
+                    }
+                    println!();
+                    io::stdout().flush().unwrap();
+                }
+                Some(Ok(Value::Unit))
             }
-            "退出" | "exit" => {
-                let code = evaluated_args.first().and_then(|v| v.as_int()).unwrap_or(0);
+            "退出" | "exit" | "tuichu" => {
+                let code = args.first().and_then(|v| v.as_int()).unwrap_or(0);
                 std::process::exit(code as i32);
             }
-            _ => Err(format!("未找到函数: {}", func_name)),
+            _ => None,
         }
     }
 

@@ -1,5 +1,14 @@
-// Copyright © 2026 幻心梦梦（huanxinmengmeng）
-// 本项目依据项目根目录的 LICENSE 文件中的幻语许可证进行许可。
+// Copyright © 2026 幻心梦梦 (huanxinmengmeng)
+// Licensed under the Apache License, Version 2.0 (the "License");
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 //! 包管理器错误类型
 
@@ -134,4 +143,87 @@ impl fmt::Display for PackageError {
             PackageError::ConfigError { message, path } => {
                 write!(f, "配置错误: {}", message)?;
                 if let Some(p) = path {
-                    write!(f, " (文件: {})
+                    write!(f, " (文件: {})", p)?;
+                }
+                Ok(())
+            }
+            PackageError::DependencyError { message, conflicts } => {
+                write!(f, "依赖解析错误: {}", message)?;
+                if let Some(c) = conflicts {
+                    write!(f, " (冲突: {:?})", c)?;
+                }
+                Ok(())
+            }
+            PackageError::RegistryError { message, code } => {
+                write!(f, "注册表错误: {}", message)?;
+                if let Some(c) = code {
+                    write!(f, " (代码: {})", c)?;
+                }
+                Ok(())
+            }
+            PackageError::NetworkError { message, url } => {
+                write!(f, "网络错误: {}", message)?;
+                if let Some(u) = url {
+                    write!(f, " (URL: {})", u)?;
+                }
+                Ok(())
+            }
+            PackageError::BuildError { message, command } => {
+                write!(f, "构建错误: {}", message)?;
+                if let Some(c) = command {
+                    write!(f, " (命令: {})", c)?;
+                }
+                Ok(())
+            }
+            PackageError::PackageError { message, package } => {
+                write!(f, "包错误: {}", message)?;
+                if let Some(p) = package {
+                    write!(f, " (包: {})", p)?;
+                }
+                Ok(())
+            }
+            PackageError::IoError { message, path } => {
+                write!(f, "IO错误: {}", message)?;
+                if let Some(p) = path {
+                    write!(f, " (路径: {})", p)?;
+                }
+                Ok(())
+            }
+            PackageError::VersionError { message, version } => {
+                write!(f, "版本错误: {}", message)?;
+                if let Some(v) = version {
+                    write!(f, " (版本: {})", v)?;
+                }
+                Ok(())
+            }
+            PackageError::AuthError { message } => {
+                write!(f, "认证错误: {}", message)
+            }
+            PackageError::UnknownError { message } => {
+                write!(f, "未知错误: {}", message)
+            }
+        }
+    }
+}
+
+impl std::error::Error for PackageError {}
+
+impl From<std::io::Error> for PackageError {
+    fn from(error: std::io::Error) -> Self {
+        PackageError::IoError {
+            message: error.to_string(),
+            path: None,
+        }
+    }
+}
+
+impl From<std::time::SystemTimeError> for PackageError {
+    fn from(error: std::time::SystemTimeError) -> Self {
+        PackageError::IoError {
+            message: error.to_string(),
+            path: None,
+        }
+    }
+}
+
+pub type PackageResult<T> = Result<T, PackageError>;

@@ -4,7 +4,7 @@ version = "0.0.1"
 edition = "2021"
 authors = ["幻心梦梦（huanxinmengmeng）"]
 description = "幻语（HuanLang）编程语言 - 支持中文、拼音、英文三语关键词的现代化编程语言"
-license = "HuanLang"
+license = "Apache-2.0"
 readme = "README.md"
 homepage = "https://gitee.com/huanxinmengmeng/huanlang"
 repository = "https://gitee.com/huanxinmengmeng/huanlang"
@@ -22,10 +22,12 @@ path = "src/main.rs"
 
 [features]
 default = []
+llvm = ["inkwell"]
 
 [dependencies]
 anyhow = "1.0"
 thiserror = "1.0"
+cfg-if = "1.0"
 codespan-reporting = "0.11"
 hashbrown = "0.14"
 parking_lot = "0.12"
@@ -60,6 +62,7 @@ chrono = "0.4"
 aes-gcm = { version = "0.10", features = ["aes", "alloc"] }
 argon2 = "0.5"
 password-hash = "0.5"
+ring = "0.17"
 # REPL依赖
 rustyline = "11.0"
 # 动态库加载依赖
@@ -67,6 +70,8 @@ libloading = "0.8"
 # 包管理器依赖
 reqwest = { version = "0.11", features = ["blocking", "json"] }
 base64 = "0.21"
+# LLVM 代码生成依赖
+inkwell = { version = "0.5.0", features = ["llvm16-0-no-llvm-linking"], optional = true }
 
 [build-dependencies]
 image = "0.24"

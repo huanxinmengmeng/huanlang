@@ -2,8 +2,8 @@
 
 ## 许可证
 
-本项目采用 **幻语许可证（HuanLang License）** 进行许可。
-版权所有 © 2026 幻心梦梦（huanxinmengmeng），保留所有权利。
+本项目采用 [Apache License 2.0](../LICENSE) 开源协议。
+版权所有 © 2026 幻心梦梦 (huanxinmengmeng)
 
 **版本：0.0.1**  
 **更新日期：2026年4月**  

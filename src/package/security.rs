@@ -1,5 +1,14 @@
-// Copyright © 2026 幻心梦梦（huanxinmengmeng）
-// 本项目依据项目根目录的 LICENSE 文件中的幻语许可证进行许可。
+// Copyright © 2026 幻心梦梦 (huanxinmengmeng)
+// Licensed under the Apache License, Version 2.0 (the "License");
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 //! 包管理器安全模块
 //! 
@@ -11,7 +20,8 @@
 use crate::package::error::{PackageError, PackageResult};
 use std::path::Path;
 use std::fs;
-use ring::{signature, digest};
+use ring::{signature, digest, rand};
+use ring::signature::KeyPair;
 use serde::{Deserialize, Serialize};
 
 /// 签名类型
@@ -86,7 +96,7 @@ pub enum SecurityIssueType {
 }
 
 /// 严重程度
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Severity {
     /// 低
     Low,
@@ -314,10 +324,13 @@ impl SignatureTool {
     pub fn generate_keypair() -> PackageResult<Self> {
         // 生成ED25519密钥对
         let rng = ring::rand::SystemRandom::new();
-        let key_pair = signature::Ed25519KeyPair::generate(&rng)
+        let pkcs8_bytes = signature::Ed25519KeyPair::generate_pkcs8(&rng)
             .map_err(|e| PackageError::package_error(&format!("密钥对生成失败: {:?}", e), None))?;
         
-        let private_key = key_pair.private_key().as_ref().to_vec();
+        let key_pair = signature::Ed25519KeyPair::from_pkcs8(pkcs8_bytes.as_ref())
+            .map_err(|e| PackageError::package_error(&format!("密钥对解析失败: {:?}", e), None))?;
+        
+        let private_key = pkcs8_bytes.as_ref().to_vec();
         let public_key = key_pair.public_key().as_ref().to_vec();
         
         Ok(Self {
@@ -347,7 +360,7 @@ impl SignatureTool {
             .map_err(|e| PackageError::io_error(&e.to_string(), Some(package_path.to_str().unwrap())))?;
         
         // 创建密钥对
-        let key_pair = signature::Ed25519KeyPair::from_private_key(&self.private_key)
+        let key_pair = signature::Ed25519KeyPair::from_pkcs8(&self.private_key)
             .map_err(|e| PackageError::package_error(&format!("密钥解析失败: {:?}", e), None))?;
         
         // 生成签名

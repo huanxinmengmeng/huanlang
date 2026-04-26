@@ -1,5 +1,14 @@
-// Copyright © 2026 幻心梦梦（huanxinmengmeng）
-// 本项目依据项目根目录的 LICENSE 文件中的幻语许可证进行许可。
+// Copyright © 2026 幻心梦梦 (huanxinmengmeng)
+// Licensed under the Apache License, Version 2.0 (the "License");
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 //! 命令行接口实现
 //! 
@@ -228,21 +237,53 @@ pub fn execute_build(cmd: BuildCommand) -> CliResult<()> {
                     if use_llvm {
                         println!("使用 LLVM 工具链进行编译...");
 
-                        // 使用 lli 直接运行 LLVM IR（如果可用）
-                        let lli_available = std::process::Command::new("lli")
-                            .arg("--version")
-                            .output()
-                            .map(|o| o.status.success())
-                            .unwrap_or(false);
+                        // 步骤1: 使用 llc 将 LLVM IR 编译成汇编文件
+                        let asm_path = format!("{}.s", base_output);
+                        let llc_output = std::process::Command::new("llc")
+                            .arg(&ll_path)
+                            .arg("-o")
+                            .arg(&asm_path)
+                            .output();
 
-                        if lli_available {
-                            println!("lli (LLVM 解释器) 可用");
-                            println!("编译成功! 可执行文件: {}", exe_path);
-                        } else {
-                            println!("注意: 当前系统没有 lli，无法直接执行 LLVM IR");
-                            println!("生成的 LLVM IR 文件位于: {}", ll_path);
-                            println!("可以使用 clang 或 gcc 手动编译");
-                            println!("编译步骤: llc {}.ll -o {}.s && clang {}.s -o {}", ll_path, base_output, base_output, exe_path);
+                        match llc_output {
+                            Ok(output) if output.status.success() => {
+                                println!("汇编文件生成: {}", asm_path);
+
+                                // 步骤2: 使用 clang 将汇编文件链接成可执行文件
+                                let clang_output = std::process::Command::new("clang")
+                                    .arg(&asm_path)
+                                    .arg("-o")
+                                    .arg(&exe_path)
+                                    .output();
+
+                                match clang_output {
+                                    Ok(output) if output.status.success() => {
+                                        println!("编译成功! 可执行文件: {}", exe_path);
+                                        
+                                        // 清理临时文件
+                                        let _ = std::fs::remove_file(&ll_path);
+                                        let _ = std::fs::remove_file(&asm_path);
+                                    }
+                                    Ok(output) => {
+                                        println!("链接失败: {}", String::from_utf8_lossy(&output.stderr));
+                                        println!("生成的 LLVM IR 文件位于: {}", ll_path);
+                                        println!("生成的汇编文件位于: {}", asm_path);
+                                    }
+                                    Err(e) => {
+                                        println!("无法执行 clang: {}", e);
+                                        println!("生成的 LLVM IR 文件位于: {}", ll_path);
+                                        println!("生成的汇编文件位于: {}", asm_path);
+                                    }
+                                }
+                            }
+                            Ok(output) => {
+                                println!("llc 编译失败: {}", String::from_utf8_lossy(&output.stderr));
+                                println!("生成的 LLVM IR 文件位于: {}", ll_path);
+                            }
+                            Err(e) => {
+                                println!("无法执行 llc: {}", e);
+                                println!("生成的 LLVM IR 文件位于: {}", ll_path);
+                            }
                         }
                     } else {
                         println!("警告: 未找到 LLVM 工具链 (llc)");
@@ -289,7 +330,7 @@ pub fn execute_run(cmd: RunCommand) -> CliResult<()> {
             return Ok(());
         }
     };
-
+    
     let mut lexer = Lexer::new(&source);
     let (tokens, lex_errors) = lexer.tokenize();
 
@@ -668,6 +709,12 @@ impl Cli {
             println!("  repl           启动交互式环境");
             println!("  fmt <文件>     格式化代码");
             println!("  edit <文件>    编辑文件");
+            println!("  serve          启动 LSP 服务器");
+            println!("  init           初始化新项目");
+            println!("  add <包>       添加依赖");
+            println!("  remove <包>    移除依赖");
+            println!("  update         更新依赖");
+            println!("  install        安装依赖");
             println!("  version        显示版本信息");
             return Ok(());
         }
@@ -789,6 +836,14 @@ impl Cli {
             "version" | "-v" | "--version" => {
                 println!("幻语编程语言 v0.1.0");
                 println!("Copyright © 2026 幻心梦梦");
+            }
+            "serve" => {
+                println!("LSP 服务器功能需要 LLVM 支持");
+                println!("请使用 --features llvm 编译以启用 LSP 功能");
+            }
+            "init" | "add" | "remove" | "update" | "install" | "publish" | "search" | "info" | "clean" | "workspace" | "security" => {
+                println!("包管理器功能需要 LLVM 支持");
+                println!("请使用 --features llvm 编译以启用包管理器功能");
             }
             _ => {
                 println!("未知命令: {}", args[1]);

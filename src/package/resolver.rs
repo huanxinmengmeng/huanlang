@@ -1,14 +1,24 @@
-// Copyright © 2026 幻心梦梦（huanxinmengmeng）
-// 本项目依据项目根目录的 LICENSE 文件中的幻语许可证进行许可。
+// Copyright © 2026 幻心梦梦 (huanxinmengmeng)
+// Licensed under the Apache License, Version 2.0 (the "License");
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 //! 依赖解析模块
 
 use std::collections::{HashMap, HashSet, BTreeSet};
+use std::hash::Hash;
 use crate::package::error::{PackageError, PackageResult};
 use crate::package::manifest::{PackageManifest, Dependency, DetailedDependency};
 
 /// 版本号
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Version {
     pub major: u32,
     pub minor: u32,
@@ -30,6 +40,50 @@ pub enum VersionConstraint {
     LessThanOrEqual(Version),
     Range(Version, Version),
     Or(Vec<VersionConstraint>),
+}
+
+impl std::fmt::Display for VersionConstraint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            VersionConstraint::Exact(v) => write!(f, "{}", v),
+            VersionConstraint::Caret(v) => write!(f, "^{}", v),
+            VersionConstraint::Tilde(v) => write!(f, "~{}", v),
+            VersionConstraint::Wildcard(0) => write!(f, "*"),
+            VersionConstraint::Wildcard(1) => write!(f, "x"),
+            VersionConstraint::Wildcard(2) => write!(f, "x.y"),
+            VersionConstraint::Wildcard(_) => write!(f, "*"),
+            VersionConstraint::GreaterThan(v) => write!(f, ">{}", v),
+            VersionConstraint::GreaterThanOrEqual(v) => write!(f, ">={}", v),
+            VersionConstraint::LessThan(v) => write!(f, "<{}", v),
+            VersionConstraint::LessThanOrEqual(v) => write!(f, "<={}", v),
+            VersionConstraint::Range(v1, v2) => write!(f, "{}..{}", v1, v2),
+            VersionConstraint::Or(constraints) => {
+                let mut first = true;
+                for constraint in constraints {
+                    if first {
+                        first = false;
+                    } else {
+                        write!(f, " || ")?;
+                    }
+                    write!(f, "{}", constraint)?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
+impl std::fmt::Display for Version {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}.{}.{}", self.major, self.minor, self.patch)?;
+        if let Some(pre) = &self.pre {
+            write!(f, "-{}", pre)?;
+        }
+        if let Some(build) = &self.build {
+            write!(f, "+{}", build)?;
+        }
+        Ok(())
+    }
 }
 
 /// 依赖解析器
@@ -218,6 +272,7 @@ impl VersionConstraint {
             VersionConstraint::Wildcard(0) => true, // *
             VersionConstraint::Wildcard(1) => true, // x
             VersionConstraint::Wildcard(2) => true, // x.y
+            VersionConstraint::Wildcard(_) => true, // 其他通配符
             VersionConstraint::GreaterThan(v) => version > v,
             VersionConstraint::GreaterThanOrEqual(v) => version >= v,
             VersionConstraint::LessThan(v) => version < v,

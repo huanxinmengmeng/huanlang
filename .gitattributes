@@ -16,3 +16,17 @@
 # 二进制文件明确标记为 binary，Git 不会尝试转换
 *.png binary
 *.ico binary
+*.jpg binary
+*.gif binary
+
+# C/C++ 文件强制保持 LF
+*.c text eol=lf
+*.cpp text eol=lf
+*.h text eol=lf
+*.hpp text eol=lf
+
+# TableGen 文件强制保持 LF
+*.td text eol=lf
+
+# Shell 脚本保持 LF
+*.sh text eol=lf

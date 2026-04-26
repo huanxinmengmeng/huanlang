@@ -1,6 +1,6 @@
 # HuanLang (幻语编程语言)
 
-[![License: HuanLang](https://img.shields.io/badge/License-HuanLang-blue.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/Version-0.0.1-green.svg)](README.md)
 [![Language](https://img.shields.io/badge/Language-Rust-orange.svg)](Cargo.toml)
 
@@ -10,14 +10,8 @@
 
 ## 许可证
 
-本项目采用 **幻语许可证（HuanLang License）** 进行许可。
-版权所有 © 2026 幻心梦梦（huanxinmengmeng），保留所有权利。
-
-所有源代码文件的头部必须添加统一的版权声明：
-```
-// Copyright © 2026 幻心梦梦（huanxinmengmeng）
-// 本项目依据项目根目录的 LICENSE 文件中的幻语许可证进行许可。
-```
+本项目采用 [Apache License 2.0](LICENSE) 开源协议。
+版权所有 © 2026 幻心梦梦 (huanxinmengmeng)
 
 ---
 
@@ -159,6 +153,9 @@ huan repl
 
 # 显示版本
 huan version
+
+# 启动 LSP 服务器
+huan serve
 
 # 跨语言转换
 huan transpile example.hl --to rust -o example.rs
@@ -558,12 +555,11 @@ s.替换("l", "L")   // -> "HeLLo"
 
 ### 源代码仓库
 
-幻语项目目前托管在两个开源代码仓库，**以 Gitee 为主仓库**，GitHub 为同步镜像仓库。
+幻语项目托管在 Gitee 开源代码仓库。
 
 | 平台 | 仓库地址 | 角色 |
 |------|---------|------|
-| **Gitee（主）** | https://gitee.com/huanxinmengmeng/huanlang.git | 主开发仓库，Issue 跟踪 |
-| **GitHub（镜像）** | https://github.com/huanxinmengmeng/huanlang.git | 同步镜像，方便国际访问 |
+| **Gitee** | https://gitee.com/huanxinmengmeng/huanlang.git | 主开发仓库，Issue 跟踪 |
 
 ### 问题反馈
 
