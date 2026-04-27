@@ -13,6 +13,7 @@
 use std::collections::HashMap;
 use crate::core::ast::*;
 use crate::core::lexer::token::SourceSpan;
+use crate::core::performance::profiler::Profiler;
 
 // ==================== 符号定义 ====================
 
@@ -994,9 +995,10 @@ impl TypeInfer {
 // ==================== 语义分析驱动 ====================
 
 pub struct SemanticAnalyzer {
-    symbol_table: SymbolTable,
-    type_infer: TypeInfer,
-    errors: Vec<SemanticError>,
+    pub symbol_table: SymbolTable,
+    pub type_infer: TypeInfer,
+    pub errors: Vec<SemanticError>,
+    pub profiler: Profiler,
 }
 
 impl SemanticAnalyzer {
@@ -1007,14 +1009,19 @@ impl SemanticAnalyzer {
             symbol_table,
             type_infer,
             errors: Vec::new(),
+            profiler: Profiler::new(),
         }
     }
 
     pub fn analyze(&mut self, program: &Program) -> Result<SymbolTable, Vec<SemanticError>> {
+        self.profiler.start_timer("sema_analyze");
+        
         if let Err(errs) = self.type_infer.infer_program(program) {
             self.errors.extend(errs.into_iter().map(|e| SemanticError::TypeError(e)));
         }
 
+        self.profiler.end_timer("sema_analyze");
+        
         if self.errors.is_empty() {
             Ok(self.symbol_table.clone())
         } else {

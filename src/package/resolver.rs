@@ -228,8 +228,8 @@ impl VersionConstraint {
             return Ok(VersionConstraint::GreaterThanOrEqual(version));
         }
         
-        if constraint.starts_with(">!") {
-            let version = Version::parse(&constraint[2..])?;
+        if constraint.starts_with(">") {
+            let version = Version::parse(&constraint[1..])?;
             return Ok(VersionConstraint::GreaterThan(version));
         }
         
@@ -238,8 +238,8 @@ impl VersionConstraint {
             return Ok(VersionConstraint::LessThanOrEqual(version));
         }
         
-        if constraint.starts_with("<!") {
-            let version = Version::parse(&constraint[2..])?;
+        if constraint.starts_with("<") {
+            let version = Version::parse(&constraint[1..])?;
             return Ok(VersionConstraint::LessThan(version));
         }
         

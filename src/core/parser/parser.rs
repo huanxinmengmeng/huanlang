@@ -13,6 +13,7 @@
 use crate::core::lexer::token::{Token, TokenKind, SourceSpan, SourcePosition};
 use crate::core::ast::*;
 use crate::core::sema::{SemanticAnalyzer, SemanticError};
+use crate::core::performance::profiler::Profiler;
 
 const PREC_LOWEST: u8 = 0;
 const PREC_ASSIGN: u8 = 1;
@@ -55,6 +56,7 @@ pub struct Parser {
     pos: usize,
     errors: Vec<ParseError>,
     semantic_analyzer: Option<SemanticAnalyzer>,
+    profiler: Profiler,
 }
 
 impl Parser {
@@ -64,6 +66,7 @@ impl Parser {
             pos: 0,
             errors: Vec::new(),
             semantic_analyzer: None,
+            profiler: Profiler::new(),
         }
     }
 
@@ -174,78 +177,85 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Result<Program, ParseError> {
-        let mut items = Vec::new();
-        while !self.is_eof() {
-            if self.check(TokenKind::Eof) {
-                break;
-            }
-            if self.check(TokenKind::RBrace) || self.check(TokenKind::End) {
-                self.advance();
-                continue;
-            }
-            match self.parse_item() {
-                Ok(item) => {
-                    items.push(item);
+        self.profiler.start_timer("parse");
+        
+        let result = {
+            let mut items = Vec::new();
+            while !self.is_eof() {
+                if self.check(TokenKind::Eof) {
+                    break;
                 }
-                Err(e) => {
-                    self.errors.push(e.clone());
-                    if matches!(e, ParseError::UnexpectedEof { .. }) {
-                        if !items.is_empty() {
+                if self.check(TokenKind::RBrace) || self.check(TokenKind::End) {
+                    self.advance();
+                    continue;
+                }
+                match self.parse_item() {
+                    Ok(item) => {
+                        items.push(item);
+                    }
+                    Err(e) => {
+                        self.errors.push(e.clone());
+                        if matches!(e, ParseError::UnexpectedEof { .. }) {
+                            if !items.is_empty() {
+                                return Ok(items);
+                            }
+                            break;
+                        }
+                        // 让所有错误都返回，以便看到具体的错误信息
+                        return Err(e);
+                    }
+                }
+            }
+            if !self.errors.is_empty() {
+                if !items.is_empty() {
+                    for error in &self.errors {
+                        if matches!(error, ParseError::UnexpectedToken { .. }) || matches!(error, ParseError::UnexpectedEof { .. }) {
                             return Ok(items);
                         }
-                        break;
                     }
-                    // 让所有错误都返回，以便看到具体的错误信息
-                    return Err(e);
-                }
-            }
-        }
-        if !self.errors.is_empty() {
-            if !items.is_empty() {
-                for error in &self.errors {
-                    if matches!(error, ParseError::UnexpectedToken { .. }) || matches!(error, ParseError::UnexpectedEof { .. }) {
-                        return Ok(items);
-                    }
+                    return Err(self.errors[0].clone());
                 }
                 return Err(self.errors[0].clone());
             }
-            return Err(self.errors[0].clone());
-        }
-        
-        // 进行语义分析
-        let mut analyzer = SemanticAnalyzer::new();
-        match analyzer.analyze(&items) {
-            Ok(_) => {
-                self.semantic_analyzer = Some(analyzer);
-                Ok(items)
-            }
-            Err(errors) => {
-                // 将语义错误转换为解析错误
-                for error in errors {
-                    match error {
-                        SemanticError::TypeError(type_error) => {
-                            let error_msg = format!("类型错误: {:?}", type_error);
-                            self.errors.push(ParseError::InvalidSyntax {
-                                message: error_msg,
-                                span: SourceSpan::dummy(),
-                            });
-                        }
-                        _ => {
-                            let error_msg = format!("语义错误: {:?}", error);
-                            self.errors.push(ParseError::InvalidSyntax {
-                                message: error_msg,
-                                span: SourceSpan::dummy(),
-                            });
+            
+            // 进行语义分析
+            let mut analyzer = SemanticAnalyzer::new();
+            match analyzer.analyze(&items) {
+                Ok(_) => {
+                    self.semantic_analyzer = Some(analyzer);
+                    Ok(items)
+                }
+                Err(errors) => {
+                    // 将语义错误转换为解析错误
+                    for error in errors {
+                        match error {
+                            SemanticError::TypeError(type_error) => {
+                                let error_msg = format!("类型错误: {:?}", type_error);
+                                self.errors.push(ParseError::InvalidSyntax {
+                                    message: error_msg,
+                                    span: SourceSpan::dummy(),
+                                });
+                            }
+                            _ => {
+                                let error_msg = format!("语义错误: {:?}", error);
+                                self.errors.push(ParseError::InvalidSyntax {
+                                    message: error_msg,
+                                    span: SourceSpan::dummy(),
+                                });
+                            }
                         }
                     }
-                }
-                if !items.is_empty() {
-                    Ok(items)
-                } else {
-                    Err(self.errors[0].clone())
+                    if !items.is_empty() {
+                        Ok(items)
+                    } else {
+                        Err(self.errors[0].clone())
+                    }
                 }
             }
-        }
+        };
+        
+        self.profiler.end_timer("parse");
+        result
     }
 
     fn parse_item(&mut self) -> Result<Item, ParseError> {

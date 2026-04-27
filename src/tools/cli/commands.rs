@@ -921,30 +921,44 @@ impl Cli {
         let args: Vec<String> = std::env::args().collect();
 
         if args.len() < 2 {
-            println!("幻语编程语言 v0.1.0");
+            println!("幻语编程语言 v0.3.0");
             println!("用法: huan <命令> [选项]");
             println!("");
             println!("可用命令:");
-            println!("  build <文件>   编译源文件");
-            println!("  check <文件>   类型检查源文件");
-            println!("  run <文件>     运行源文件");
-            println!("  repl           启动交互式环境");
-            println!("  fmt <文件>              格式化代码");
-            println!("  edit <文件>             编辑文件");
-            println!("  transpile <文件>        代码转译");
-            println!("  gen-bindings <文件>     生成绑定");
-            println!("  import-lib <库文件>     导入外部库");
-            println!("  serve                   启动 LSP 服务器");
-            println!("  init                    初始化新项目");
-            println!("  add <包>                添加依赖");
-            println!("  remove <包>             移除依赖");
-            println!("  update                  更新依赖");
-            println!("  install                 安装依赖");
-            println!("  version                 显示版本信息");
+            println!("  编译和运行:");
+            println!("    build <文件>           编译源文件");
+            println!("    check <文件>           类型检查源文件");
+            println!("    run <文件>             运行源文件");
+            println!("    repl                   启动交互式环境");
+            println!("  代码工具:");
+            println!("    fmt <文件>             格式化代码");
+            println!("    edit <文件>            编辑文件");
+            println!("    transpile <文件>       代码转译");
+            println!("  绑定和库:");
+            println!("    gen-bindings <文件>    生成绑定");
+            println!("    import-lib <库文件>    导入外部库");
+            println!("  LSP服务:");
+            println!("    serve                  启动 LSP 服务器");
+            println!("  包管理:");
+            println!("    package                包管理命令");
+            println!("  其他:");
+            println!("    help                   显示帮助信息");
+            println!("    version                显示版本信息");
+            println!("");
+            println!("使用 'huan help <命令>' 查看命令的详细用法");
             return Ok(());
         }
 
         match args[1].as_str() {
+            "help" => {
+                if args.len() > 2 {
+                    // 显示特定命令的帮助
+                    show_command_help(&args[2]);
+                } else {
+                    // 显示所有命令的帮助
+                    show_general_help();
+                }
+            }
             "build" => {
                 let mut cmd = BuildCommand::new(String::new());
                 let mut i = 2;
@@ -1152,16 +1166,30 @@ impl Cli {
                 }
             }
             "version" | "-v" | "--version" => {
-                println!("幻语编程语言 v0.1.0");
+                println!("幻语编程语言 v0.3.0");
                 println!("Copyright © 2026 幻心梦梦");
             }
             "serve" => {
                 println!("LSP 服务器功能需要 LLVM 支持");
                 println!("请使用 --features llvm 编译以启用 LSP 功能");
             }
+            "package" => {
+                // 包管理命令 - 调整参数顺序
+                if args.len() > 2 {
+                    let mut package_args = vec![args[0].clone()];
+                    package_args.extend_from_slice(&args[2..]);
+                    if let Err(e) = crate::package::commands::Command::execute(&package_args) {
+                        eprintln!("错误: {}", e);
+                    }
+                } else {
+                    println!("包管理命令: init, add, remove, update, install, publish, search, info, clean, workspace, security");
+                }
+            }
             "init" | "add" | "remove" | "update" | "install" | "publish" | "search" | "info" | "clean" | "workspace" | "security" => {
-                println!("包管理器功能需要 LLVM 支持");
-                println!("请使用 --features llvm 编译以启用包管理器功能");
+                // 兼容旧命令格式
+                if let Err(e) = crate::package::commands::Command::execute(&args) {
+                    eprintln!("错误: {}", e);
+                }
             }
             _ => {
                 println!("未知命令: {}", args[1]);
@@ -1170,5 +1198,137 @@ impl Cli {
         }
 
         Ok(())
+    }
+}
+
+/// 显示通用帮助信息
+fn show_general_help() {
+    println!("幻语编程语言 v0.3.0");
+    println!("用法: huan <命令> [选项]");
+    println!("");
+    println!("可用命令:");
+    println!("  编译和运行:");
+    println!("    build <文件>           编译源文件");
+    println!("    check <文件>           类型检查源文件");
+    println!("    run <文件>             运行源文件");
+    println!("    repl                   启动交互式环境");
+    println!("  代码工具:");
+    println!("    fmt <文件>             格式化代码");
+    println!("    edit <文件>            编辑文件");
+    println!("    transpile <文件>       代码转译");
+    println!("  绑定和库:");
+    println!("    gen-bindings <文件>    生成绑定");
+    println!("    import-lib <库文件>    导入外部库");
+    println!("  LSP服务:");
+    println!("    serve                  启动 LSP 服务器");
+    println!("  包管理:");
+    println!("    package                包管理命令");
+    println!("  其他:");
+    println!("    help                   显示帮助信息");
+    println!("    version                显示版本信息");
+    println!("");
+    println!("使用 'huan help <命令>' 查看命令的详细用法");
+}
+
+/// 显示特定命令的帮助
+fn show_command_help(cmd: &str) {
+    match cmd {
+        "build" => {
+            println!("编译源文件");
+            println!("用法: huan build <源文件> [选项]");
+            println!("");
+            println!("选项:");
+            println!("  -o, --output <文件>       指定输出文件名");
+            println!("  -O, --optimize <级别>    设置优化级别 (0-3, s, z)");
+            println!("  --debug                  生成调试信息");
+            println!("  --ownership               启用所有权检查");
+            println!("  --lto                     启用链接时优化");
+            println!("  --release                启用发布模式 (完全优化)");
+            println!("  --strip                  去除符号表");
+            println!("  --target <平台>          指定目标平台");
+            println!("  --emit <格式>            指定输出格式 (asm, llvm-ir, obj)");
+        },
+        "check" => {
+            println!("类型检查源文件");
+            println!("用法: huan check <源文件>");
+        },
+        "run" => {
+            println!("运行源文件");
+            println!("用法: huan run <源文件> [参数]");
+        },
+        "repl" => {
+            println!("启动交互式编程环境");
+            println!("用法: huan repl");
+            println!("");
+            println!("REPL 命令:");
+            println!("  :quit, :q  - 退出 REPL");
+            println!("  :help, :h  - 显示帮助信息");
+            println!("  :clear, :c - 清屏");
+        },
+        "fmt" => {
+            println!("格式化代码");
+            println!("用法: huan fmt <源文件> [选项]");
+            println!("");
+            println!("选项:");
+            println!("  --check  - 检查格式，不修改文件");
+            println!("  --write  - 直接修改原文件");
+        },
+        "edit" => {
+            println!("编辑文件");
+            println!("用法: huan edit <文件>");
+        },
+        "transpile" => {
+            println!("代码转译");
+            println!("用法: huan transpile <源文件> [选项]");
+            println!("");
+            println!("选项:");
+            println!("  -o, --output <文件>           指定输出文件名");
+            println!("  --target, -t <语言>         指定目标语言");
+            println!("支持的语言: rust, python, c, java, go, kotlin, swift");
+        },
+        "gen-bindings" => {
+            println!("生成绑定");
+            println!("用法: huan gen-bindings <源文件> [选项]");
+            println!("");
+            println!("选项:");
+            println!("  --output-dir <目录>  指定输出目录");
+            println!("  --name <名称>        指定导出名称");
+            println!("  --lang <语言>        指定目标语言 (逗号分隔)");
+            println!("支持的语言: python, kotlin, swift");
+        },
+        "import-lib" => {
+            println!("导入外部库");
+            println!("用法: huan import-lib <库文件> [--lang <语言>]");
+        },
+        "serve" => {
+            println!("启动 LSP 服务器");
+            println!("用法: huan serve");
+            println!("注意: 需要使用 --features llvm 编译以启用 LSP 功能");
+        },
+        "package" => {
+            println!("包管理命令");
+            println!("用法: huan package <子命令> [选项]");
+            println!("");
+            println!("子命令:");
+            println!("  init <名称>           初始化新项目");
+            println!("  add <包名>@<版本>    添加依赖包");
+            println!("  remove <包名>         移除依赖包");
+            println!("  update                更新所有依赖");
+            println!("  install               安装所有依赖");
+            println!("  publish               发布当前包");
+            println!("  search <关键词>       搜索包");
+            println!("  info <包名>           显示包信息");
+            println!("  clean [--days <天数>] 清理缓存");
+            println!("  workspace             工作区管理");
+            println!("  security              安全相关命令");
+        },
+        "version" => {
+            println!("显示版本信息");
+            println!("用法: huan version, huan -v, huan --version");
+        },
+        _ => {
+            println!("未知命令: {}", cmd);
+            println!("使用 'huan help' 查看可用命令列表");
+        }
     }
 }

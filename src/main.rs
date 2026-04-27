@@ -12,10 +12,17 @@
 
 use std::process;
 use huanlang::tools::cli::Cli;
+use huanlang::core::performance::logger;
 
 fn main() {
+    // 初始化日志系统
+    logger::init();
+    logger::info("幻语编译器启动");
+    
     if let Err(e) = Cli::run() {
-        eprintln!("错误: {}", e);
+        logger::error(&format!("错误: {}", e));
         process::exit(1);
     }
+    
+    logger::info("编译完成");
 }

@@ -20,6 +20,7 @@ use crate::package::lockfile::PackageLock;
 use crate::package::resolver::DependencyResolver;
 use crate::package::registry::RegistryClient;
 use crate::package::cache::CacheManager;
+use crate::package::workspace::Workspace;
 
 /// 命令类型
 #[derive(Debug, Clone, PartialEq)]
@@ -540,20 +541,67 @@ impl Command {
     /// 清理缓存
     fn clean(&self) -> CommandResult {
         println!("正在清理缓存...");
-        // 模拟清理过程
+        
+        // 创建缓存管理器
+        let cache = CacheManager::new()?;
+        
+        // 清理过期缓存（默认30天）
+        let days = self.args.options.get("days").and_then(|d| d.parse().ok()).unwrap_or(30);
+        let removed = cache.clean(days)?;
+        
+        // 显示缓存大小
+        let size = cache.get_cache_size()?;
+        let size_mb = size as f64 / (1024.0 * 1024.0);
+        
         println!("缓存清理成功！");
+        println!("  移除了 {} 个过期包", removed);
+        println!("  当前缓存大小: {:.2} MB", size_mb);
+        
         Ok(0)
     }
 
     /// 工作区命令
     fn workspace(&self) -> CommandResult {
         match self.args.subcommand.as_deref() {
-            Some("add") => println!("添加工作区成员成功！"),
-            Some("remove") => println!("移除工作区成员成功！"),
-            Some("list") => println!("工作区成员列表:
-  * member1
-  * member2"),
-            _ => println!("工作区命令: add, remove, list"),
+            Some("add") => {
+                if self.args.args.is_empty() {
+                    return Err(PackageError::config_error("请指定要添加的成员路径", None));
+                }
+                let member_path = &self.args.args[0];
+                let workspace = Workspace::from_dir(".")?;
+                let mut workspace = workspace;
+                workspace.add_member(member_path)?;
+                println!("添加工作区成员成功！");
+            }
+            Some("remove") => {
+                if self.args.args.is_empty() {
+                    return Err(PackageError::config_error("请指定要移除的成员名称", None));
+                }
+                let member_name = &self.args.args[0];
+                let workspace = Workspace::from_dir(".")?;
+                let mut workspace = workspace;
+                workspace.remove_member(member_name)?;
+                println!("移除工作区成员成功！");
+            }
+            Some("list") => {
+                let workspace = Workspace::from_dir(".")?;
+                let members = workspace.get_members();
+                println!("工作区成员列表:");
+                for member in members {
+                    println!("  * {} ({})", member.name, member.path);
+                }
+            }
+            Some("build") => {
+                let workspace = Workspace::from_dir(".")?;
+                workspace.build()?;
+                println!("工作区构建成功！");
+            }
+            Some("test") => {
+                let workspace = Workspace::from_dir(".")?;
+                workspace.test()?;
+                println!("工作区测试成功！");
+            }
+            _ => println!("工作区命令: add, remove, list, build, test"),
         }
         Ok(0)
     }
