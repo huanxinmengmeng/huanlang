@@ -1,5 +1,6 @@
 // Copyright © 2026 幻心梦梦 (huanxinmengmeng)
 // Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
@@ -14,7 +15,7 @@
 
 #include "huan/HuanDialect.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 
 using namespace mlir;
 using namespace huan;
@@ -24,50 +25,19 @@ namespace {
 // 类型转换器
 class HuanToSCFTypeConverter : public TypeConverter {
 public:
-    HuanToSCFTypeConverter() {}
+    HuanToSCFTypeConverter() {
+        // 添加类型转换回调
+        addConversion([](Type type) -> Type {
+            return type;
+        });
+    }
 };
 
-// 操作降级模式
+// 操作降级模式基类
 class LowerHuanToSCFPattern : public ConversionPattern {
 public:
-    LowerHuanToSCFPattern(MLIRContext *context) : ConversionPattern(PatternBenefit::High, context) {}
-};
-
-// 循环降级
-class LowerHLLoopOp : public LowerHuanToSCFPattern {
-public:
-    using LowerHuanToSCFPattern::LowerHuanToSCFPattern;
-    
-    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
-        auto loopOp = cast<HLLoopOp>(op);
-        auto condition = operands[0];
-        
-        // 创建 SCF while 循环
-        auto whileOp = rewriter.create<scf::WhileOp>(op->getLoc(), 
-            loopOp.getCondition().getType(), 
-            ValueRange{}, 
-            [&](OpBuilder &builder, Location loc, ValueRange args) {
-                // 条件分支
-                auto condition = builder.create<mlir::Value>(loc, loopOp.getCondition().getType());
-                builder.create<scf::ConditionOp>(loc, condition, ValueRange{});
-            },
-            [&](OpBuilder &builder, Location loc, ValueRange args) {
-                // 循环体
-                auto bodyBuilder = rewriter.saveInsertionPoint();
-                rewriter.setInsertionPointToStart(&loopOp.getBody().front());
-                
-                // 复制循环体内容
-                for (auto &innerOp : loopOp.getBody().front().getOperations()) {
-                    rewriter.clone(innerOp);
-                }
-                
-                rewriter.restoreInsertionPoint(bodyBuilder);
-                builder.create<scf::YieldOp>(loc, ValueRange{});
-            });
-        
-        rewriter.eraseOp(op);
-        return success();
-    }
+    LowerHuanToSCFPattern(MLIRContext *context) 
+        : ConversionPattern(PatternBenefit::High, context) {}
 };
 
 // 条件判断降级
@@ -76,41 +46,107 @@ public:
     using LowerHuanToSCFPattern::LowerHuanToSCFPattern;
     
     LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
-        auto ifOp = cast<HLIfOp>(op);
+        auto ifOp = dyn_cast<HLIfOp>(op);
+        if (!ifOp) return failure();
+        
         auto condition = operands[0];
         
         // 创建 SCF if 操作
         auto scfIfOp = rewriter.create<scf::IfOp>(op->getLoc(), 
             TypeRange{}, 
             condition, 
-            [&](OpBuilder &builder, Location loc) {
-                // then 分支
-                auto thenBuilder = rewriter.saveInsertionPoint();
-                rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
-                
-                // 复制 then 分支内容
-                for (auto &innerOp : ifOp.getThenRegion().front().getOperations()) {
-                    rewriter.clone(innerOp);
-                }
-                
-                rewriter.restoreInsertionPoint(thenBuilder);
-                builder.create<scf::YieldOp>(loc, ValueRange{});
-            },
-            [&](OpBuilder &builder, Location loc) {
-                // else 分支（如果存在）
-                if (ifOp.getElseRegion()) {
-                    auto elseBuilder = rewriter.saveInsertionPoint();
-                    rewriter.setInsertionPointToStart(&ifOp.getElseRegion()->front());
-                    
-                    // 复制 else 分支内容
-                    for (auto &innerOp : ifOp.getElseRegion()->front().getOperations()) {
+            /*hasElse*/ !ifOp.getElseRegion().empty());
+        
+        // 构建 then 分支
+        auto &thenRegion = scfIfOp.getThenRegion();
+        if (!thenRegion.empty()) {
+            rewriter.eraseBlock(&thenRegion.front());
+        }
+        Block *thenBlock = rewriter.createBlock(&thenRegion);
+        rewriter.setInsertionPointToStart(thenBlock);
+        
+        // 复制原 then 分支内容
+        if (!ifOp.getThenRegion().empty()) {
+            auto &srcThenRegion = ifOp.getThenRegion();
+            if (!srcThenRegion.empty()) {
+                for (auto &innerOp : srcThenRegion.front().getOperations()) {
+                    if (!innerOp.hasTrait<OpTrait::IsTerminator>()) {
                         rewriter.clone(innerOp);
                     }
-                    
-                    rewriter.restoreInsertionPoint(elseBuilder);
                 }
-                builder.create<scf::YieldOp>(loc, ValueRange{});
-            });
+            }
+        }
+        
+        rewriter.create<scf::YieldOp>(op->getLoc(), ValueRange{});
+        
+        // 构建 else 分支（如果存在）
+        if (!ifOp.getElseRegion().empty()) {
+            auto &elseRegion = scfIfOp.getElseRegion();
+            if (!elseRegion.empty()) {
+                rewriter.eraseBlock(&elseRegion.front());
+            }
+            Block *elseBlock = rewriter.createBlock(&elseRegion);
+            rewriter.setInsertionPointToStart(elseBlock);
+            
+            // 复制原 else 分支内容
+            auto &srcElseRegion = ifOp.getElseRegion();
+            if (!srcElseRegion.empty()) {
+                for (auto &innerOp : srcElseRegion.front().getOperations()) {
+                    if (!innerOp.hasTrait<OpTrait::IsTerminator>()) {
+                        rewriter.clone(innerOp);
+                    }
+                }
+            }
+            
+            rewriter.create<scf::YieldOp>(op->getLoc(), ValueRange{});
+        }
+        
+        rewriter.eraseOp(op);
+        return success();
+    }
+};
+
+// 循环降级
+class LowerHLLoopOp : public LowerHuanToSCFPattern {
+public:
+    using LowerHuanToSCFPattern::LowerHuanToSCFPattern;
+    
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto loopOp = dyn_cast<HLLoopOp>(op);
+        if (!loopOp) return failure();
+        
+        auto condition = operands[0];
+        
+        // 创建 SCF while 循环
+        auto whileOp = rewriter.create<scf::WhileOp>(op->getLoc(), 
+            TypeRange{}, 
+            ValueRange{});
+        
+        // 构建 before 区域（条件检查）
+        auto &beforeRegion = whileOp.getBefore();
+        Block *beforeBlock = rewriter.createBlock(&beforeRegion);
+        rewriter.setInsertionPointToStart(beforeBlock);
+        
+        rewriter.create<scf::ConditionOp>(op->getLoc(), condition, ValueRange{});
+        
+        // 构建 after 区域（循环体）
+        auto &afterRegion = whileOp.getAfter();
+        Block *afterBlock = rewriter.createBlock(&afterRegion);
+        rewriter.setInsertionPointToStart(afterBlock);
+        
+        // 复制原循环体内容
+        if (!loopOp.getBody().empty()) {
+            auto &srcBody = loopOp.getBody();
+            if (!srcBody.empty()) {
+                for (auto &innerOp : srcBody.front().getOperations()) {
+                    if (!innerOp.hasTrait<OpTrait::IsTerminator>()) {
+                        rewriter.clone(innerOp);
+                    }
+                }
+            }
+        }
+        
+        rewriter.create<scf::YieldOp>(op->getLoc(), ValueRange{});
         
         rewriter.eraseOp(op);
         return success();
@@ -130,13 +166,15 @@ public:
         RewritePatternSet patterns(context);
         
         // 添加降级模式
-        patterns.add<LowerHLLoopOp>(context);
         patterns.add<LowerHLIfOp>(context);
+        patterns.add<LowerHLLoopOp>(context);
         
         ConversionTarget target(*context);
         target.addLegalDialect<scf::SCFDialect>();
-        target.addIllegalOp<HLLoopOp>();
+        target.addLegalDialect<arith::ArithDialect>();
+        target.addLegalDialect<func::FuncDialect>();
         target.addIllegalOp<HLIfOp>();
+        target.addIllegalOp<HLLoopOp>();
         
         if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
             signalPassFailure();

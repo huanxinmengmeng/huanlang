@@ -1,6 +1,6 @@
 [package]
 name = "performance-example"
-version = "0.1.0"
+version = "0.3.0"
 edition = "1.2"
 authors = ["Performance Team <perf@example.com>"]
 description = "性能优化和调试示例项目"

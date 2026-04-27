@@ -1,5 +1,6 @@
 // Copyright © 2026 幻心梦梦 (huanxinmengmeng)
 // Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
@@ -21,105 +22,15 @@ using namespace huan;
 
 namespace {
 
-// 操作降级模式
+// 操作降级模式基类
 class LowerHuanToArithPattern : public ConversionPattern {
 public:
-    LowerHuanToArithPattern(MLIRContext *context) : ConversionPattern(PatternBenefit::High, context) {}
-};
-
-// 二元操作降级到 Arith
-class LowerHLBinOpToArith : public LowerHuanToArithPattern {
-public:
-    LowerHLBinOpToArith(StringRef opName, MLIRContext *context) 
-        : LowerHuanToArithPattern(context), opName(opName) {}
-    
-    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
-        if (op->getName().getStringRef() != opName) return failure();
-        
-        auto resultType = op->getResult(0).getType();
-        
-        if (opName == "huan.add") {
-            rewriter.replaceOpWithNewOp<arith::AddIOp>(op, resultType, operands[0], operands[1]);
-        } else if (opName == "huan.sub") {
-            rewriter.replaceOpWithNewOp<arith::SubIOp>(op, resultType, operands[0], operands[1]);
-        } else if (opName == "huan.mul") {
-            rewriter.replaceOpWithNewOp<arith::MulIOp>(op, resultType, operands[0], operands[1]);
-        } else if (opName == "huan.div") {
-            rewriter.replaceOpWithNewOp<arith::DivSIOp>(op, resultType, operands[0], operands[1]);
-        }
-        
-        return success();
-    }
-    
-private:
-    StringRef opName;
-};
-
-// 比较操作降级到 Arith
-class LowerHLCompareOpToArith : public LowerHuanToArithPattern {
-public:
-    LowerHLCompareOpToArith(StringRef opName, MLIRContext *context) 
-        : LowerHuanToArithPattern(context), opName(opName) {}
-    
-    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
-        if (op->getName().getStringRef() != opName) return failure();
-        
-        auto resultType = op->getResult(0).getType();
-        arith::CmpIPredicate predicate;
-        
-        if (opName == "huan.eq") {
-            predicate = arith::CmpIPredicate::eq;
-        } else if (opName == "huan.ne") {
-            predicate = arith::CmpIPredicate::ne;
-        } else if (opName == "huan.lt") {
-            predicate = arith::CmpIPredicate::slt;
-        } else if (opName == "huan.le") {
-            predicate = arith::CmpIPredicate::sle;
-        } else if (opName == "huan.ge") {
-            predicate = arith::CmpIPredicate::sge;
-        } else if (opName == "huan.gr") {
-            predicate = arith::CmpIPredicate::sgt;
-        } else {
-            return failure();
-        }
-        
-        rewriter.replaceOpWithNewOp<arith::CmpIOp>(op, predicate, operands[0], operands[1]);
-        return success();
-    }
-    
-private:
-    StringRef opName;
-};
-
-// 逻辑操作降级到 Arith
-class LowerHLLogicalOpToArith : public LowerHuanToArithPattern {
-public:
-    LowerHLLogicalOpToArith(StringRef opName, MLIRContext *context) 
-        : LowerHuanToArithPattern(context), opName(opName) {}
-    
-    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
-        if (op->getName().getStringRef() != opName) return failure();
-        
-        auto resultType = op->getResult(0).getType();
-        
-        if (opName == "huan.and") {
-            rewriter.replaceOpWithNewOp<arith::AndIOp>(op, resultType, operands[0], operands[1]);
-        } else if (opName == "huan.or") {
-            rewriter.replaceOpWithNewOp<arith::OrIOp>(op, resultType, operands[0], operands[1]);
-        } else if (opName == "huan.not") {
-            rewriter.replaceOpWithNewOp<arith::XOrIOp>(op, resultType, operands[0], 
-                rewriter.create<arith::ConstantOp>(op->getLoc(), resultType, rewriter.getIntegerAttr(resultType, 1)));
-        }
-        
-        return success();
-    }
-    
-private:
-    StringRef opName;
+    LowerHuanToArithPattern(MLIRContext *context) 
+        : ConversionPattern(PatternBenefit::High, context) {}
 };
 
 // 常量降级到 Arith
-class LowerHLConstOpToArith : public LowerHuanToArithPattern {
+class LowerHLConstOp : public LowerHuanToArithPattern {
 public:
     using LowerHuanToArithPattern::LowerHuanToArithPattern;
     
@@ -146,6 +57,192 @@ public:
     }
 };
 
+// 二元操作降级到 Arith
+class LowerHLAddOp : public LowerHuanToArithPattern {
+public:
+    using LowerHuanToArithPattern::LowerHuanToArithPattern;
+    
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto addOp = dyn_cast<HLAddOp>(op);
+        if (!addOp) return failure();
+        
+        auto resultType = addOp.getResult().getType();
+        rewriter.replaceOpWithNewOp<arith::AddIOp>(op, resultType, operands[0], operands[1]);
+        return success();
+    }
+};
+
+class LowerHLSubOp : public LowerHuanToArithPattern {
+public:
+    using LowerHuanToArithPattern::LowerHuanToArithPattern;
+    
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto subOp = dyn_cast<HLSubOp>(op);
+        if (!subOp) return failure();
+        
+        auto resultType = subOp.getResult().getType();
+        rewriter.replaceOpWithNewOp<arith::SubIOp>(op, resultType, operands[0], operands[1]);
+        return success();
+    }
+};
+
+class LowerHLMulOp : public LowerHuanToArithPattern {
+public:
+    using LowerHuanToArithPattern::LowerHuanToArithPattern;
+    
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto mulOp = dyn_cast<HLMulOp>(op);
+        if (!mulOp) return failure();
+        
+        auto resultType = mulOp.getResult().getType();
+        rewriter.replaceOpWithNewOp<arith::MulIOp>(op, resultType, operands[0], operands[1]);
+        return success();
+    }
+};
+
+class LowerHLDivOp : public LowerHuanToArithPattern {
+public:
+    using LowerHuanToArithPattern::LowerHuanToArithPattern;
+    
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto divOp = dyn_cast<HLDivOp>(op);
+        if (!divOp) return failure();
+        
+        auto resultType = divOp.getResult().getType();
+        rewriter.replaceOpWithNewOp<arith::DivSIOp>(op, resultType, operands[0], operands[1]);
+        return success();
+    }
+};
+
+// 比较操作降级到 Arith
+class LowerHLEqOp : public LowerHuanToArithPattern {
+public:
+    using LowerHuanToArithPattern::LowerHuanToArithPattern;
+    
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto eqOp = dyn_cast<HLEqOp>(op);
+        if (!eqOp) return failure();
+        
+        auto resultType = eqOp.getResult().getType();
+        rewriter.replaceOpWithNewOp<arith::CmpIOp>(op, arith::CmpIPredicate::eq, operands[0], operands[1]);
+        return success();
+    }
+};
+
+class LowerHLNeOp : public LowerHuanToArithPattern {
+public:
+    using LowerHuanToArithPattern::LowerHuanToArithPattern;
+    
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto neOp = dyn_cast<HLNeOp>(op);
+        if (!neOp) return failure();
+        
+        auto resultType = neOp.getResult().getType();
+        rewriter.replaceOpWithNewOp<arith::CmpIOp>(op, arith::CmpIPredicate::ne, operands[0], operands[1]);
+        return success();
+    }
+};
+
+class LowerHLLtOp : public LowerHuanToArithPattern {
+public:
+    using LowerHuanToArithPattern::LowerHuanToArithPattern;
+    
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto ltOp = dyn_cast<HLLtOp>(op);
+        if (!ltOp) return failure();
+        
+        auto resultType = ltOp.getResult().getType();
+        rewriter.replaceOpWithNewOp<arith::CmpIOp>(op, arith::CmpIPredicate::slt, operands[0], operands[1]);
+        return success();
+    }
+};
+
+class LowerHLLeOp : public LowerHuanToArithPattern {
+public:
+    using LowerHuanToArithPattern::LowerHuanToArithPattern;
+    
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto leOp = dyn_cast<HLLeOp>(op);
+        if (!leOp) return failure();
+        
+        auto resultType = leOp.getResult().getType();
+        rewriter.replaceOpWithNewOp<arith::CmpIOp>(op, arith::CmpIPredicate::sle, operands[0], operands[1]);
+        return success();
+    }
+};
+
+class LowerHLGeOp : public LowerHuanToArithPattern {
+public:
+    using LowerHuanToArithPattern::LowerHuanToArithPattern;
+    
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto geOp = dyn_cast<HLGeOp>(op);
+        if (!geOp) return failure();
+        
+        auto resultType = geOp.getResult().getType();
+        rewriter.replaceOpWithNewOp<arith::CmpIOp>(op, arith::CmpIPredicate::sge, operands[0], operands[1]);
+        return success();
+    }
+};
+
+class LowerHLGrOp : public LowerHuanToArithPattern {
+public:
+    using LowerHuanToArithPattern::LowerHuanToArithPattern;
+    
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto grOp = dyn_cast<HLGrOp>(op);
+        if (!grOp) return failure();
+        
+        auto resultType = grOp.getResult().getType();
+        rewriter.replaceOpWithNewOp<arith::CmpIOp>(op, arith::CmpIPredicate::sgt, operands[0], operands[1]);
+        return success();
+    }
+};
+
+// 逻辑操作降级到 Arith
+class LowerHLAndOp : public LowerHuanToArithPattern {
+public:
+    using LowerHuanToArithPattern::LowerHuanToArithPattern;
+    
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto andOp = dyn_cast<HLAndOp>(op);
+        if (!andOp) return failure();
+        
+        auto resultType = andOp.getResult().getType();
+        rewriter.replaceOpWithNewOp<arith::AndIOp>(op, resultType, operands[0], operands[1]);
+        return success();
+    }
+};
+
+class LowerHLOrOp : public LowerHuanToArithPattern {
+public:
+    using LowerHuanToArithPattern::LowerHuanToArithPattern;
+    
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto orOp = dyn_cast<HLOrOp>(op);
+        if (!orOp) return failure();
+        
+        auto resultType = orOp.getResult().getType();
+        rewriter.replaceOpWithNewOp<arith::OrIOp>(op, resultType, operands[0], operands[1]);
+        return success();
+    }
+};
+
+class LowerHLNotOp : public LowerHuanToArithPattern {
+public:
+    using LowerHuanToArithPattern::LowerHuanToArithPattern;
+    
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto notOp = dyn_cast<HLNotOp>(op);
+        if (!notOp) return failure();
+        
+        auto resultType = notOp.getResult().getType();
+        auto one = rewriter.create<arith::ConstantOp>(op->getLoc(), resultType, rewriter.getIntegerAttr(resultType, 1));
+        rewriter.replaceOpWithNewOp<arith::XOrIOp>(op, resultType, operands[0], one);
+        return success();
+    }
+};
+
 // 模块降级 Pass
 class LowerHuanToArithPass : public PassWrapper<LowerHuanToArithPass, OperationPass<ModuleOp>> {
 public:
@@ -158,23 +255,25 @@ public:
         RewritePatternSet patterns(context);
         
         // 添加降级模式
-        patterns.add<LowerHLConstOpToArith>(context);
-        patterns.add<LowerHLBinOpToArith>("huan.add", context);
-        patterns.add<LowerHLBinOpToArith>("huan.sub", context);
-        patterns.add<LowerHLBinOpToArith>("huan.mul", context);
-        patterns.add<LowerHLBinOpToArith>("huan.div", context);
-        patterns.add<LowerHLCompareOpToArith>("huan.eq", context);
-        patterns.add<LowerHLCompareOpToArith>("huan.ne", context);
-        patterns.add<LowerHLCompareOpToArith>("huan.lt", context);
-        patterns.add<LowerHLCompareOpToArith>("huan.le", context);
-        patterns.add<LowerHLCompareOpToArith>("huan.ge", context);
-        patterns.add<LowerHLCompareOpToArith>("huan.gr", context);
-        patterns.add<LowerHLLogicalOpToArith>("huan.and", context);
-        patterns.add<LowerHLLogicalOpToArith>("huan.or", context);
-        patterns.add<LowerHLLogicalOpToArith>("huan.not", context);
+        patterns.add<LowerHLConstOp>(context);
+        patterns.add<LowerHLAddOp>(context);
+        patterns.add<LowerHLSubOp>(context);
+        patterns.add<LowerHLMulOp>(context);
+        patterns.add<LowerHLDivOp>(context);
+        patterns.add<LowerHLEqOp>(context);
+        patterns.add<LowerHLNeOp>(context);
+        patterns.add<LowerHLLtOp>(context);
+        patterns.add<LowerHLLeOp>(context);
+        patterns.add<LowerHLGeOp>(context);
+        patterns.add<LowerHLGrOp>(context);
+        patterns.add<LowerHLAndOp>(context);
+        patterns.add<LowerHLOrOp>(context);
+        patterns.add<LowerHLNotOp>(context);
         
         ConversionTarget target(*context);
         target.addLegalDialect<arith::ArithDialect>();
+        target.addLegalDialect<scf::SCFDialect>();
+        target.addLegalDialect<func::FuncDialect>();
         target.addIllegalOp<HLConstOp>();
         target.addIllegalOp<HLAddOp>();
         target.addIllegalOp<HLSubOp>();

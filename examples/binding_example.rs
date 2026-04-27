@@ -63,14 +63,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 生成绑定
     println!("--- 生成绑定 ---");
     println!("导出项目数: {}", exported_items.len());
-    println!("目标语言: {:?}", generator.options.target_languages);
-    println!("输出目录: {:?}", generator.options.output_dir);
+    println!("输出目录: {:?}", generator.get_output_dir());
     println!();
 
     match generator.generate(&exported_items) {
         Ok(_) => {
             println!("✓ 绑定生成成功！");
-            println!("  输出文件位于: {:?}", generator.options.output_dir);
+            println!("  输出文件位于: {:?}", generator.get_output_dir());
             println!("  - huanlib.py (Python 绑定)");
             println!("  - huanlib.kt (Kotlin 绑定)");
             println!("  - huanlib.swift (Swift 绑定)");

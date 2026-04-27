@@ -101,8 +101,24 @@ pub struct ResolutionResult {
 impl Version {
     /// 解析版本字符串
     pub fn parse(version: &str) -> PackageResult<Self> {
-        let parts: Vec<&str> = version.split(|c| c == '.' || c == '-' || c == '+').collect();
-        
+        // 首先分离 build 元数据（+build）
+        let (version_part, build_part) = if let Some(pos) = version.rfind('+') {
+            let (v, b) = version.split_at(pos);
+            (v, Some(b[1..].to_string()))
+        } else {
+            (version, None)
+        };
+
+        // 然后分离 pre-release（-pre）
+        let (version_part, pre_part) = if let Some(pos) = version_part.rfind('-') {
+            let (v, pre) = version_part.split_at(pos);
+            (v, Some(pre[1..].to_string()))
+        } else {
+            (version_part, None)
+        };
+
+        let parts: Vec<&str> = version_part.split('.').collect();
+
         if parts.len() < 3 {
             return Err(PackageError::version_error("版本格式无效", Some(version)));
         }
@@ -111,26 +127,12 @@ impl Version {
         let minor = parts[1].parse().map_err(|_| PackageError::version_error("次版本无效", Some(version)))?;
         let patch = parts[2].parse().map_err(|_| PackageError::version_error("补丁版本无效", Some(version)))?;
 
-        let mut pre = None;
-        let mut build = None;
-
-        for part in parts.iter().skip(3) {
-            if part.is_empty() {
-                continue;
-            }
-            if pre.is_none() && !part.chars().all(|c| c.is_digit(10)) {
-                pre = Some(part.to_string());
-            } else if build.is_none() {
-                build = Some(part.to_string());
-            }
-        }
-
         Ok(Version {
             major,
             minor,
             patch,
-            pre,
-            build,
+            pre: pre_part,
+            build: build_part,
         })
     }
 
@@ -325,7 +327,29 @@ impl DependencyResolver {
             }
             visited.insert(package.clone());
 
-            let constraint = root_deps.get(&package).unwrap();
+            // 确定约束：根依赖或传递依赖
+            let constraint = if let Some(c) = root_deps.get(&package) {
+                c.clone()
+            } else {
+                // 传递依赖：从已解析的依赖链中查找
+                let mut found_constraint = None;
+                for (pkg, version) in &resolved {
+                    if let Some(deps) = self.dependencies.get(pkg) {
+                        if let Some(constraints) = deps.get(version) {
+                            for (dep_name, dep_constraint) in constraints {
+                                if dep_name == &package {
+                                    found_constraint = Some(dep_constraint.clone());
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                found_constraint.ok_or_else(|| {
+                    PackageError::version_error(&format!("找不到包 {} 的依赖约束", package), Some(&package))
+                })?
+            };
+
             let versions = self.packages.get(&package).ok_or_else(|| {
                 PackageError::package_error(&format!("包 {} 不存在", package), Some(&package))
             })?;

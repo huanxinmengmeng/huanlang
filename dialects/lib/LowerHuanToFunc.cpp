@@ -1,5 +1,6 @@
 // Copyright © 2026 幻心梦梦 (huanxinmengmeng)
 // Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
@@ -21,14 +22,15 @@ using namespace huan;
 
 namespace {
 
-// 操作降级模式
+// 操作降级模式基类
 class LowerHuanToFuncPattern : public ConversionPattern {
 public:
-    LowerHuanToFuncPattern(MLIRContext *context) : ConversionPattern(PatternBenefit::High, context) {}
+    LowerHuanToFuncPattern(MLIRContext *context) 
+        : ConversionPattern(PatternBenefit::High, context) {}
 };
 
 // 函数定义降级到 Func
-class LowerHLFuncOpToFunc : public LowerHuanToFuncPattern {
+class LowerHLFuncOp : public LowerHuanToFuncPattern {
 public:
     using LowerHuanToFuncPattern::LowerHuanToFuncPattern;
     
@@ -40,19 +42,20 @@ public:
         auto type = funcOp.getType();
         
         // 创建 Func 函数
-        auto funcType = type.cast<FunctionType>();
-        auto newFuncOp = rewriter.create<func::FuncOp>(op->getLoc(), name, funcType);
+        auto newFuncOp = rewriter.create<func::FuncOp>(op->getLoc(), name, type);
         
         // 复制函数体
-        if (funcOp.getBody()) {
-            auto &body = funcOp.getBody();
-            auto &newBody = newFuncOp.getBody();
-            
-            // 复制函数体内容
-            for (auto &innerOp : body.front().getOperations()) {
-                rewriter.clone(innerOp);
-            }
+        if (funcOp.getBodyRegion().empty()) {
+            rewriter.eraseOp(op);
+            return success();
         }
+        
+        // 移动或复制函数体
+        auto &bodyRegion = funcOp.getBodyRegion();
+        auto &newBodyRegion = newFuncOp.getBody();
+        
+        // 克隆 region 内容
+        rewriter.inlineRegionBefore(bodyRegion, newBodyRegion, newBodyRegion.end());
         
         rewriter.eraseOp(op);
         return success();
@@ -60,7 +63,7 @@ public:
 };
 
 // 函数调用降级到 Func
-class LowerHLCallOpToFunc : public LowerHuanToFuncPattern {
+class LowerHLCallOp : public LowerHuanToFuncPattern {
 public:
     using LowerHuanToFuncPattern::LowerHuanToFuncPattern;
     
@@ -73,7 +76,7 @@ public:
         
         // 创建 Func 调用
         auto resultType = callOp.getResult().getType();
-        auto newCallOp = rewriter.create<func::CallOp>(op->getLoc(), name, resultType, args);
+        auto newCallOp = rewriter.create<func::CallOp>(op->getLoc(), resultType, name, args);
         
         rewriter.replaceOp(op, newCallOp.getResults());
         return success();
@@ -81,7 +84,7 @@ public:
 };
 
 // 返回操作降级到 Func
-class LowerHLReturnOpToFunc : public LowerHuanToFuncPattern {
+class LowerHLReturnOp : public LowerHuanToFuncPattern {
 public:
     using LowerHuanToFuncPattern::LowerHuanToFuncPattern;
     
@@ -90,10 +93,10 @@ public:
         if (!returnOp) return failure();
         
         // 创建 Func 返回操作
-        if (returnOp.getValue()) {
-            rewriter.replaceOpWithNewOp<func::ReturnOp>(op, operands[0]);
-        } else {
+        if (operands.empty()) {
             rewriter.replaceOpWithNewOp<func::ReturnOp>(op);
+        } else {
+            rewriter.replaceOpWithNewOp<func::ReturnOp>(op, operands);
         }
         
         return success();
@@ -112,12 +115,14 @@ public:
         RewritePatternSet patterns(context);
         
         // 添加降级模式
-        patterns.add<LowerHLFuncOpToFunc>(context);
-        patterns.add<LowerHLCallOpToFunc>(context);
-        patterns.add<LowerHLReturnOpToFunc>(context);
+        patterns.add<LowerHLFuncOp>(context);
+        patterns.add<LowerHLCallOp>(context);
+        patterns.add<LowerHLReturnOp>(context);
         
         ConversionTarget target(*context);
         target.addLegalDialect<func::FuncDialect>();
+        target.addLegalDialect<scf::SCFDialect>();
+        target.addLegalDialect<arith::ArithDialect>();
         target.addIllegalOp<HLFuncOp>();
         target.addIllegalOp<HLCallOp>();
         target.addIllegalOp<HLReturnOp>();

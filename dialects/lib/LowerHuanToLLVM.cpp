@@ -1,5 +1,6 @@
 // Copyright © 2026 幻心梦梦 (huanxinmengmeng)
 // Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
@@ -17,6 +18,7 @@
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 using namespace mlir;
 using namespace huan;
@@ -29,14 +31,18 @@ public:
     using LLVMTypeConverter::LLVMTypeConverter;
     
     Type convertType(Type type) override {
-        if (auto intType = type.dyn_cast<HLIntType>()) {
-            return IntegerType::get(getContext(), intType.getWidth());
+        if (type.isa<HLIntType>()) {
+            if (auto intType = type.dyn_cast<HLIntType>()) {
+                return IntegerType::get(getContext(), intType.getWidth());
+            }
         }
-        if (auto floatType = type.dyn_cast<HLFloatType>()) {
-            switch (floatType.getWidth()) {
-                case 32: return Float32Type::get(getContext());
-                case 64: return Float64Type::get(getContext());
-                default: return type;
+        if (type.isa<HLFloatType>()) {
+            if (auto floatType = type.dyn_cast<HLFloatType>()) {
+                switch (floatType.getWidth()) {
+                    case 32: return Float32Type::get(getContext());
+                    case 64: return Float64Type::get(getContext());
+                    default: break;
+                }
             }
         }
         if (type.isa<HLBoolType>()) {
@@ -49,7 +55,7 @@ public:
     }
 };
 
-// 操作降级模式
+// 操作降级模式基类
 class LowerHuanToLLVMPattern : public ConvertToLLVMPattern {
 public:
     LowerHuanToLLVMPattern(HuanToLLVMTypeConverter &converter, MLIRContext *context)
@@ -62,121 +68,326 @@ public:
     using LowerHuanToLLVMPattern::LowerHuanToLLVMPattern;
     
     LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
-        auto constOp = cast<HLConstOp>(op);
+        auto constOp = dyn_cast<HLConstOp>(op);
+        if (!constOp) return failure();
+        
         auto value = constOp.getValue();
+        auto llvmType = typeConverter->convertType(constOp.getResult().getType());
         
         if (auto intAttr = value.dyn_cast<IntegerAttr>()) {
-            rewriter.replaceOpWithNewOp<LLVM::ConstantOp>(op, 
-                typeConverter->convertType(constOp.getType()), 
-                intAttr);
+            rewriter.replaceOpWithNewOp<LLVM::ConstantOp>(op, llvmType, intAttr);
             return success();
         }
         if (auto floatAttr = value.dyn_cast<FloatAttr>()) {
-            rewriter.replaceOpWithNewOp<LLVM::ConstantOp>(op, 
-                typeConverter->convertType(constOp.getType()), 
-                floatAttr);
+            rewriter.replaceOpWithNewOp<LLVM::ConstantOp>(op, llvmType, floatAttr);
             return success();
         }
-        if (auto stringAttr = value.dyn_cast<StringAttr>()) {
-            // 处理字符串常量
-            rewriter.replaceOpWithNewOp<LLVM::ConstantOp>(op, 
-                typeConverter->convertType(constOp.getType()), 
-                stringAttr);
-            return success();
-        }
+        
         return failure();
     }
 };
 
-// 二元操作降级
-class LowerHLBinOp : public LowerHuanToLLVMPattern {
+// 变量声明降级
+class LowerHLVarOp : public LowerHuanToLLVMPattern {
 public:
-    LowerHLBinOp(StringRef opName, HuanToLLVMTypeConverter &converter, MLIRContext *context)
-        : LowerHuanToLLVMPattern(converter, context), opName(opName) {}
+    using LowerHuanToLLVMPattern::LowerHuanToLLVMPattern;
     
     LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
-        if (op->getName().getStringRef() != opName) return failure();
+        auto varOp = dyn_cast<HLVarOp>(op);
+        if (!varOp) return failure();
         
-        auto resultType = typeConverter->convertType(op->getResult(0).getType());
+        auto name = varOp.getName();
+        auto llvmType = typeConverter->convertType(varOp.getType());
         
-        if (opName == "huan.add") {
-            rewriter.replaceOpWithNewOp<LLVM::AddOp>(op, resultType, operands[0], operands[1]);
-        } else if (opName == "huan.sub") {
-            rewriter.replaceOpWithNewOp<LLVM::SubOp>(op, resultType, operands[0], operands[1]);
-        } else if (opName == "huan.mul") {
-            rewriter.replaceOpWithNewOp<LLVM::MulOp>(op, resultType, operands[0], operands[1]);
-        } else if (opName == "huan.div") {
-            rewriter.replaceOpWithNewOp<LLVM::SDivOp>(op, resultType, operands[0], operands[1]);
+        auto alloc = rewriter.create<LLVM::AllocaOp>(op->getLoc(),
+            LLVM::LLVMPointerType::get(llvmType),
+            llvmType,
+            rewriter.create<LLVM::ConstantOp>(op->getLoc(),
+                rewriter.getI32Type(),
+                rewriter.getIntegerAttr(rewriter.getI32Type(), 1)));
+        
+        if (operands.size() == 1 && operands[0]) {
+            rewriter.create<LLVM::StoreOp>(op->getLoc(), operands[0], alloc);
         }
         
+        rewriter.eraseOp(op);
         return success();
     }
+};
+
+// 赋值操作降级
+class LowerHLAssignOp : public LowerHuanToLLVMPattern {
+public:
+    using LowerHuanToLLVMPattern::LowerHuanToLLVMPattern;
     
-private:
-    StringRef opName;
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto assignOp = dyn_cast<HLAssignOp>(op);
+        if (!assignOp) return failure();
+        
+        auto name = assignOp.getName();
+        
+        auto load = rewriter.create<LLVM::LoadOp>(op->getLoc(),
+            LLVM::LLVMPointerType::get(operands[0].getType()),
+            operands[0]);
+        
+        rewriter.create<LLVM::StoreOp>(op->getLoc(), operands[1], load);
+        rewriter.eraseOp(op);
+        return success();
+    }
+};
+
+// 二元操作降级
+class LowerHLAddOp : public LowerHuanToLLVMPattern {
+public:
+    using LowerHuanToLLVMPattern::LowerHuanToLLVMPattern;
+    
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto addOp = dyn_cast<HLAddOp>(op);
+        if (!addOp) return failure();
+        
+        auto resultType = typeConverter->convertType(addOp.getResult().getType());
+        rewriter.replaceOpWithNewOp<LLVM::AddOp>(op, resultType, operands[0], operands[1]);
+        return success();
+    }
+};
+
+class LowerHLSubOp : public LowerHuanToLLVMPattern {
+public:
+    using LowerHuanToLLVMPattern::LowerHuanToLLVMPattern;
+    
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto subOp = dyn_cast<HLSubOp>(op);
+        if (!subOp) return failure();
+        
+        auto resultType = typeConverter->convertType(subOp.getResult().getType());
+        rewriter.replaceOpWithNewOp<LLVM::SubOp>(op, resultType, operands[0], operands[1]);
+        return success();
+    }
+};
+
+class LowerHLMulOp : public LowerHuanToLLVMPattern {
+public:
+    using LowerHuanToLLVMPattern::LowerHuanToLLVMPattern;
+    
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto mulOp = dyn_cast<HLMulOp>(op);
+        if (!mulOp) return failure();
+        
+        auto resultType = typeConverter->convertType(mulOp.getResult().getType());
+        rewriter.replaceOpWithNewOp<LLVM::MulOp>(op, resultType, operands[0], operands[1]);
+        return success();
+    }
+};
+
+class LowerHLDivOp : public LowerHuanToLLVMPattern {
+public:
+    using LowerHuanToLLVMPattern::LowerHuanToLLVMPattern;
+    
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto divOp = dyn_cast<HLDivOp>(op);
+        if (!divOp) return failure();
+        
+        auto resultType = typeConverter->convertType(divOp.getResult().getType());
+        rewriter.replaceOpWithNewOp<LLVM::SDivOp>(op, resultType, operands[0], operands[1]);
+        return success();
+    }
 };
 
 // 比较操作降级
-class LowerHLCompareOp : public LowerHuanToLLVMPattern {
+class LowerHLEqOp : public LowerHuanToLLVMPattern {
 public:
-    LowerHLCompareOp(StringRef opName, HuanToLLVMTypeConverter &converter, MLIRContext *context)
-        : LowerHuanToLLVMPattern(converter, context), opName(opName) {}
+    using LowerHuanToLLVMPattern::LowerHuanToLLVMPattern;
     
     LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
-        if (op->getName().getStringRef() != opName) return failure();
+        auto eqOp = dyn_cast<HLEqOp>(op);
+        if (!eqOp) return failure();
         
-        auto resultType = typeConverter->convertType(op->getResult(0).getType());
-        LLVM::ICmpPredicate predicate;
-        
-        if (opName == "huan.eq") {
-            predicate = LLVM::ICmpPredicate::eq;
-        } else if (opName == "huan.ne") {
-            predicate = LLVM::ICmpPredicate::ne;
-        } else if (opName == "huan.lt") {
-            predicate = LLVM::ICmpPredicate::slt;
-        } else if (opName == "huan.le") {
-            predicate = LLVM::ICmpPredicate::sle;
-        } else if (opName == "huan.ge") {
-            predicate = LLVM::ICmpPredicate::sge;
-        } else if (opName == "huan.gr") {
-            predicate = LLVM::ICmpPredicate::sgt;
-        } else {
-            return failure();
-        }
-        
-        rewriter.replaceOpWithNewOp<LLVM::ICmpOp>(op, resultType, predicate, operands[0], operands[1]);
+        auto resultType = typeConverter->convertType(eqOp.getResult().getType());
+        rewriter.replaceOpWithNewOp<LLVM::ICmpOp>(op, resultType, LLVM::ICmpPredicate::eq, operands[0], operands[1]);
         return success();
     }
+};
+
+class LowerHLNeOp : public LowerHuanToLLVMPattern {
+public:
+    using LowerHuanToLLVMPattern::LowerHuanToLLVMPattern;
     
-private:
-    StringRef opName;
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto neOp = dyn_cast<HLNeOp>(op);
+        if (!neOp) return failure();
+        
+        auto resultType = typeConverter->convertType(neOp.getResult().getType());
+        rewriter.replaceOpWithNewOp<LLVM::ICmpOp>(op, resultType, LLVM::ICmpPredicate::ne, operands[0], operands[1]);
+        return success();
+    }
+};
+
+class LowerHLLtOp : public LowerHuanToLLVMPattern {
+public:
+    using LowerHuanToLLVMPattern::LowerHuanToLLVMPattern;
+    
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto ltOp = dyn_cast<HLLtOp>(op);
+        if (!ltOp) return failure();
+        
+        auto resultType = typeConverter->convertType(ltOp.getResult().getType());
+        rewriter.replaceOpWithNewOp<LLVM::ICmpOp>(op, resultType, LLVM::ICmpPredicate::slt, operands[0], operands[1]);
+        return success();
+    }
+};
+
+class LowerHLLeOp : public LowerHuanToLLVMPattern {
+public:
+    using LowerHuanToLLVMPattern::LowerHuanToLLVMPattern;
+    
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto leOp = dyn_cast<HLLeOp>(op);
+        if (!leOp) return failure();
+        
+        auto resultType = typeConverter->convertType(leOp.getResult().getType());
+        rewriter.replaceOpWithNewOp<LLVM::ICmpOp>(op, resultType, LLVM::ICmpPredicate::sle, operands[0], operands[1]);
+        return success();
+    }
+};
+
+class LowerHLGeOp : public LowerHuanToLLVMPattern {
+public:
+    using LowerHuanToLLVMPattern::LowerHuanToLLVMPattern;
+    
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto geOp = dyn_cast<HLGeOp>(op);
+        if (!geOp) return failure();
+        
+        auto resultType = typeConverter->convertType(geOp.getResult().getType());
+        rewriter.replaceOpWithNewOp<LLVM::ICmpOp>(op, resultType, LLVM::ICmpPredicate::sge, operands[0], operands[1]);
+        return success();
+    }
+};
+
+class LowerHLGrOp : public LowerHuanToLLVMPattern {
+public:
+    using LowerHuanToLLVMPattern::LowerHuanToLLVMPattern;
+    
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto grOp = dyn_cast<HLGrOp>(op);
+        if (!grOp) return failure();
+        
+        auto resultType = typeConverter->convertType(grOp.getResult().getType());
+        rewriter.replaceOpWithNewOp<LLVM::ICmpOp>(op, resultType, LLVM::ICmpPredicate::sgt, operands[0], operands[1]);
+        return success();
+    }
 };
 
 // 逻辑操作降级
-class LowerHLLogicalOp : public LowerHuanToLLVMPattern {
+class LowerHLAndOp : public LowerHuanToLLVMPattern {
 public:
-    LowerHLLogicalOp(StringRef opName, HuanToLLVMTypeConverter &converter, MLIRContext *context)
-        : LowerHuanToLLVMPattern(converter, context), opName(opName) {}
+    using LowerHuanToLLVMPattern::LowerHuanToLLVMPattern;
     
     LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
-        if (op->getName().getStringRef() != opName) return failure();
+        auto andOp = dyn_cast<HLAndOp>(op);
+        if (!andOp) return failure();
         
-        auto resultType = typeConverter->convertType(op->getResult(0).getType());
+        auto resultType = typeConverter->convertType(andOp.getResult().getType());
+        rewriter.replaceOpWithNewOp<LLVM::AndOp>(op, resultType, operands[0], operands[1]);
+        return success();
+    }
+};
+
+class LowerHLOrOp : public LowerHuanToLLVMPattern {
+public:
+    using LowerHuanToLLVMPattern::LowerHuanToLLVMPattern;
+    
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto orOp = dyn_cast<HLOrOp>(op);
+        if (!orOp) return failure();
         
-        if (opName == "huan.and") {
-            rewriter.replaceOpWithNewOp<LLVM::AndOp>(op, resultType, operands[0], operands[1]);
-        } else if (opName == "huan.or") {
-            rewriter.replaceOpWithNewOp<LLVM::OrOp>(op, resultType, operands[0], operands[1]);
-        } else if (opName == "huan.not") {
-            rewriter.replaceOpWithNewOp<LLVM::XorOp>(op, resultType, operands[0], 
-                rewriter.create<LLVM::ConstantOp>(op->getLoc(), resultType, rewriter.getIntegerAttr(resultType, 1)));
+        auto resultType = typeConverter->convertType(orOp.getResult().getType());
+        rewriter.replaceOpWithNewOp<LLVM::OrOp>(op, resultType, operands[0], operands[1]);
+        return success();
+    }
+};
+
+class LowerHLNotOp : public LowerHuanToLLVMPattern {
+public:
+    using LowerHuanToLLVMPattern::LowerHuanToLLVMPattern;
+    
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto notOp = dyn_cast<HLNotOp>(op);
+        if (!notOp) return failure();
+        
+        auto resultType = typeConverter->convertType(notOp.getResult().getType());
+        auto one = rewriter.create<LLVM::ConstantOp>(op->getLoc(), resultType, rewriter.getIntegerAttr(resultType, 1));
+        rewriter.replaceOpWithNewOp<LLVM::XorOp>(op, resultType, operands[0], one);
+        return success();
+    }
+};
+
+// 函数定义降级
+class LowerHLFuncOp : public LowerHuanToLLVMPattern {
+public:
+    using LowerHuanToLLVMPattern::LowerHuanToLLVMPattern;
+    
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto funcOp = dyn_cast<HLFuncOp>(op);
+        if (!funcOp) return failure();
+        
+        auto name = funcOp.getName();
+        auto type = typeConverter->convertType(funcOp.getType());
+        
+        auto llvmFuncType = type.dyn_cast<LLVM::LLVMFunctionType>();
+        if (!llvmFuncType) return failure();
+        
+        auto newFuncOp = rewriter.create<LLVM::LLVMFuncOp>(op->getLoc(), name, llvmFuncType);
+        
+        if (!funcOp.getBodyRegion().empty()) {
+            auto &bodyRegion = funcOp.getBodyRegion();
+            auto &newBodyRegion = newFuncOp.getBody();
+            rewriter.inlineRegionBefore(bodyRegion, newBodyRegion, newBodyRegion.end());
+        }
+        
+        rewriter.eraseOp(op);
+        return success();
+    }
+};
+
+// 函数调用降级
+class LowerHLCallOp : public LowerHuanToLLVMPattern {
+public:
+    using LowerHuanToLLVMPattern::LowerHuanToLLVMPattern;
+    
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto callOp = dyn_cast<HLCallOp>(op);
+        if (!callOp) return failure();
+        
+        auto name = callOp.getName();
+        auto resultType = typeConverter->convertType(callOp.getResult().getType());
+        
+        SmallVector<Value> args(operands.begin(), operands.end());
+        auto callee = rewriter.create<LLVM::LLVMFuncOp>(op->getLoc(), name,
+            LLVM::LLVMPointerType::get(LLVM::LLVMFunctionType::get(resultType, {})));
+        
+        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, resultType, callee, args);
+        return success();
+    }
+};
+
+// 返回操作降级
+class LowerHLReturnOp : public LowerHuanToLLVMPattern {
+public:
+    using LowerHuanToLLVMPattern::LowerHuanToLLVMPattern;
+    
+    LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands, ConversionPatternRewriter &rewriter) const override {
+        auto returnOp = dyn_cast<HLReturnOp>(op);
+        if (!returnOp) return failure();
+        
+        if (operands.empty()) {
+            rewriter.replaceOpWithNewOp<LLVM::ReturnOp>(op, ValueRange{});
+        } else {
+            rewriter.replaceOpWithNewOp<LLVM::ReturnOp>(op, operands);
         }
         
         return success();
     }
-    
-private:
-    StringRef opName;
 };
 
 // 模块降级 Pass
@@ -193,19 +404,24 @@ public:
         
         // 添加降级模式
         patterns.add<LowerHLConstOp>(typeConverter, context);
-        patterns.add<LowerHLBinOp>("huan.add", typeConverter, context);
-        patterns.add<LowerHLBinOp>("huan.sub", typeConverter, context);
-        patterns.add<LowerHLBinOp>("huan.mul", typeConverter, context);
-        patterns.add<LowerHLBinOp>("huan.div", typeConverter, context);
-        patterns.add<LowerHLCompareOp>("huan.eq", typeConverter, context);
-        patterns.add<LowerHLCompareOp>("huan.ne", typeConverter, context);
-        patterns.add<LowerHLCompareOp>("huan.lt", typeConverter, context);
-        patterns.add<LowerHLCompareOp>("huan.le", typeConverter, context);
-        patterns.add<LowerHLCompareOp>("huan.ge", typeConverter, context);
-        patterns.add<LowerHLCompareOp>("huan.gr", typeConverter, context);
-        patterns.add<LowerHLLogicalOp>("huan.and", typeConverter, context);
-        patterns.add<LowerHLLogicalOp>("huan.or", typeConverter, context);
-        patterns.add<LowerHLLogicalOp>("huan.not", typeConverter, context);
+        patterns.add<LowerHLVarOp>(typeConverter, context);
+        patterns.add<LowerHLAssignOp>(typeConverter, context);
+        patterns.add<LowerHLAddOp>(typeConverter, context);
+        patterns.add<LowerHLSubOp>(typeConverter, context);
+        patterns.add<LowerHLMulOp>(typeConverter, context);
+        patterns.add<LowerHLDivOp>(typeConverter, context);
+        patterns.add<LowerHLEqOp>(typeConverter, context);
+        patterns.add<LowerHLNeOp>(typeConverter, context);
+        patterns.add<LowerHLLtOp>(typeConverter, context);
+        patterns.add<LowerHLLeOp>(typeConverter, context);
+        patterns.add<LowerHLGeOp>(typeConverter, context);
+        patterns.add<LowerHLGrOp>(typeConverter, context);
+        patterns.add<LowerHLAndOp>(typeConverter, context);
+        patterns.add<LowerHLOrOp>(typeConverter, context);
+        patterns.add<LowerHLNotOp>(typeConverter, context);
+        patterns.add<LowerHLFuncOp>(typeConverter, context);
+        patterns.add<LowerHLCallOp>(typeConverter, context);
+        patterns.add<LowerHLReturnOp>(typeConverter, context);
         
         ConversionTarget target(*context);
         target.addLegalDialect<LLVM::LLVMDialect>();

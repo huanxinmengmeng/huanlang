@@ -18,14 +18,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use crate::package::error::{PackageError, PackageResult};
 use crate::package::manifest::PackageManifest;
-use crate::package::dependency::Dependency;
 
 /// 工作区
 pub struct Workspace {
     root: String,
     config: WorkspaceConfig,
     members: HashMap<String, PackageManifest>,
-    dependencies: HashMap<String, Dependency>,
+    dependencies: HashMap<String, crate::package::manifest::Dependency>,
 }
 
 /// 工作区配置
@@ -36,7 +35,7 @@ pub struct WorkspaceConfig {
     pub default_members: Option<Vec<String>>,
     pub resolver: Option<String>,
     pub package: Option<Value>,
-    pub dependencies: Option<std::collections::HashMap<String, Dependency>>,
+    pub dependencies: Option<std::collections::HashMap<String, crate::package::manifest::Dependency>>,
 }
 
 /// 工作区成员
@@ -67,39 +66,7 @@ impl Workspace {
         
         // 转换为 workspace::WorkspaceConfig
         let converted_deps = manifest_workspace.dependencies.map(|deps| {
-            deps.into_iter().map(|(name, dep)| {
-                let converted = match dep {
-                    crate::package::manifest::Dependency::Version(v) => {
-                        Dependency {
-                            version: Some(v),
-                            registry: None,
-                            path: None,
-                            git: None,
-                            branch: None,
-                            tag: None,
-                            rev: None,
-                            optional: None,
-                            features: None,
-                            default_features: None,
-                        }
-                    },
-                    crate::package::manifest::Dependency::Detailed(d) => {
-                        Dependency {
-                            version: d.version,
-                            registry: d.registry,
-                            path: d.path,
-                            git: d.git,
-                            branch: d.branch,
-                            tag: d.tag,
-                            rev: d.rev,
-                            optional: d.optional,
-                            features: d.features,
-                            default_features: None,
-                        }
-                    }
-                };
-                (name, converted)
-            }).collect()
+            deps.into_iter().collect()
         });
         
         let config = WorkspaceConfig {
@@ -215,24 +182,13 @@ impl Workspace {
     }
 
     /// 获取工作区依赖
-    pub fn get_dependencies(&self) -> &HashMap<String, Dependency> {
+    pub fn get_dependencies(&self) -> &HashMap<String, crate::package::manifest::Dependency> {
         &self.dependencies
     }
 
     /// 添加工作区依赖
     pub fn add_dependency(&mut self, name: &str, version: &str) -> PackageResult<()> {
-        let dependency = Dependency {
-            version: Some(version.to_string()),
-            registry: None,
-            path: None,
-            git: None,
-            branch: None,
-            tag: None,
-            rev: None,
-            optional: None,
-            features: None,
-            default_features: None,
-        };
+        let dependency = crate::package::manifest::Dependency::Version(version.to_string());
         self.dependencies.insert(name.to_string(), dependency.clone());
         
         if self.config.dependencies.is_none() {
@@ -459,6 +415,7 @@ impl FeatureManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::package::manifest::Dependency;
     use std::fs;
 
     #[test]
@@ -471,13 +428,13 @@ mod tests {
         let workspace_toml = r#"
 [package]
 name = "workspace"
-version = "0.1.0"
+version = "0.3.0"
 
 [workspace]
 members = ["member1", "member2"]
 
 [workspace.dependencies]
-common = "1.0.0"
+"common" = "1.0.0"
 "#;
         
         fs::write(root.join("幻语包.toml"), workspace_toml).unwrap();
@@ -490,7 +447,7 @@ common = "1.0.0"
         let member1_toml = r#"
 [package]
 name = "member1"
-version = "0.1.0"
+version = "0.3.0"
 
 [dependencies]
 common = { workspace = true }
@@ -499,7 +456,7 @@ common = { workspace = true }
         let member2_toml = r#"
 [package]
 name = "member2"
-version = "0.1.0"
+version = "0.3.0"
 
 [dependencies]
 common = { workspace = true }
@@ -519,7 +476,7 @@ member1 = { path = "../member1" }
         
         // 验证依赖
         assert!(workspace.dependencies.contains_key("common"));
-        assert_eq!(workspace.dependencies.get("common"), Some(&"1.0.0".to_string()));
+        assert_eq!(workspace.dependencies.get("common"), Some(&Dependency::Version("1.0.0".to_string())));
     }
 
     #[test]
@@ -527,7 +484,7 @@ member1 = { path = "../member1" }
         let toml = r#"
 [package]
 name = "test"
-version = "0.1.0"
+version = "0.3.0"
 
 [features]
 default = ["std"]
@@ -545,10 +502,10 @@ json = ["serde", "dep:serde_json"]
         assert!(feature_manager.has_feature("json"));
         
         // 验证功能依赖
-        assert_eq!(feature_manager.get_feature_dependencies("json"), Some(&vec!["serde", "dep:serde_json"]));
+        assert_eq!(feature_manager.get_feature_dependencies("json"), Some(&vec!["serde".to_string(), "dep:serde_json".to_string()]));
         
         // 解析功能
-        let resolved = feature_manager.resolve_features(&["json"]);
+        let resolved = feature_manager.resolve_features(&["json".to_string()]);
         assert!(resolved.contains("json"));
         assert!(resolved.contains("serde"));
     }

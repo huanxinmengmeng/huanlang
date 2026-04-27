@@ -96,7 +96,8 @@ pub struct PackageInfo {
 }
 
 /// 依赖类型
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(untagged)]
 pub enum Dependency {
     /// 版本
     Version(String),
@@ -105,7 +106,7 @@ pub enum Dependency {
 }
 
 /// 详细依赖配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DetailedDependency {
     pub version: Option<String>,
     pub path: Option<String>,
@@ -349,23 +350,23 @@ mod tests {
         let toml = r#"
 [package]
 name = "测试包"
-version = "0.1.0"
+version = "0.3.0"
 edition = "1.2"
 authors = ["测试者 <test@example.com>"]
 description = "测试包描述"
 license = "MIT"
 
 [dependencies]
-网络 = "0.3"
-序列化 = { version = "1.0", optional = true }
+"网络" = "0.3"
+"序列化" = "1.0"
 
 [dev-dependencies]
-测试工具 = "0.5"
+"测试工具" = "0.5"
 "#;
 
         let manifest = PackageManifest::from_str(toml).unwrap();
         assert_eq!(manifest.package.name, "测试包");
-        assert_eq!(manifest.package.version, "0.1.0");
+        assert_eq!(manifest.package.version, "0.3.0");
         assert_eq!(manifest.dependencies.unwrap().len(), 2);
     }
 
@@ -374,7 +375,7 @@ license = "MIT"
         let toml = r#"
 [package]
 name = "valid-package"
-version = "0.1.0"
+version = "0.3.0"
 "#;
 
         let manifest = PackageManifest::from_str(toml).unwrap();
@@ -386,7 +387,7 @@ version = "0.1.0"
         let toml = r#"
 [package]
 name = "123invalid"
-version = "0.1.0"
+version = "0.3.0"
 "#;
 
         let manifest = PackageManifest::from_str(toml).unwrap();

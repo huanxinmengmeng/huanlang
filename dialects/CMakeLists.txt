@@ -48,7 +48,7 @@ target_link_libraries(LowerHuanToLLVM
 )
 
 # 安装
-sinstall(TARGETS HuanDialect LowerHuanToLLVM
+install(TARGETS HuanDialect LowerHuanToLLVM
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
 )

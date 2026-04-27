@@ -1,0 +1,32 @@
+# 构建产物
+target/
+build/
+
+# 编辑器文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 环境变量文件
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 日志文件
+*.log
+
+# 临时文件
+*.tmp
+*.temp
+
+# 依赖管理
+Cargo.lock
+幻语包.lock

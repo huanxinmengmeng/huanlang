@@ -352,7 +352,7 @@ mod tests {
             "令 x 为 42".to_string()
         );
         assert_eq!(doc.uri, "file:///test.hl");
-        assert_eq!(doc.version, 1);
+        assert_eq!(doc._version, 1);
         assert_eq!(doc.num_lines(), 1);
     }
 

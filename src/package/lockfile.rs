@@ -239,7 +239,7 @@ mod tests {
     use super::*;
     use crate::package::resolver::DependencyResolver;
     use crate::package::resolver::Version;
-    use crate::package::dependency::VersionConstraint;
+    use crate::package::resolver::VersionConstraint;
 
     #[test]
     fn test_lock_file_creation() {

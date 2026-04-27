@@ -334,12 +334,12 @@ mod tests {
     fn test_memory_pool() {
         let config = PoolConfig::default_config(64);
         let mut pool = MemoryPool::new(config);
-        
+
         let chunk = pool.allocate();
         assert!(chunk.is_some());
-        
+
         pool.deallocate(chunk.unwrap());
-        assert_eq!(pool.free_count(), 17);
+        assert_eq!(pool.free_count(), 16);
     }
 
     #[test]

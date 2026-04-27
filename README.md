@@ -1,7 +1,7 @@
 # HuanLang (幻语编程语言)
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-0.0.1-green.svg)](README.md)
+[![Version](https://img.shields.io/badge/Version-0.3.0-green.svg)](README.md)
 [![Language](https://img.shields.io/badge/Language-Rust-orange.svg)](Cargo.toml)
 
 <p align="center">
@@ -19,7 +19,7 @@
 
 幻语（HuanLang）是一款现代化的编程语言，支持**中文**、**拼音**和**英文**三种关键词体系。开发者可以根据自己的习惯自由选择关键词语言，极大降低了学习曲线，同时为国际化协作和 AI 代码生成提供了灵活性。
 
-**版本**: 0.1.0
+**版本**: 0.3.0
 **发布日期**: 2026年4月
 
 ### 核心特性
@@ -38,7 +38,7 @@
 | 属性 | 值 |
 |------|-----|
 | 语言名称 | 幻语（HuanLang） |
-| 版本 | 0.1.0 |
+| 版本 | 0.3.0 |
 | 文件扩展名 | `.hl`（源代码）、`.hla`（AI交换格式）、`.hlm`（模块接口）、`.hlp`（包文件）、`.hasm`（独立汇编） |
 | MIME 类型 | `text/x-huan` |
 | 编码 | UTF-8 无 BOM |

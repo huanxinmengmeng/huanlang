@@ -1,6 +1,6 @@
 [package]
 name = "basic-project"
-version = "0.1.0"
+version = "0.3.0"
 edition = "1.2"
 authors = ["测试者 <test@example.com>"]
 description = "基础项目示例"
@@ -23,31 +23,31 @@ json = ["序列化"]
 
 [lib]
 name = "basic_project"
-path = "src/lib.幻"
+path = "src/lib.hl"
 
 bin = [
     {
         name = "basic-project",
-        path = "src/main.幻"
+        path = "src/main.hl"
     }
 ]
 
 [examples]
 hello = {
     name = "hello",
-    path = "examples/hello.幻"
+    path = "examples/hello.hl"
 }
 
 [tests]
 test_basic = {
     name = "test_basic",
-    path = "tests/test_basic.幻"
+    path = "tests/test_basic.hl"
 }
 
 [benches]
 benchmark = {
     name = "benchmark",
-    path = "benches/benchmark.幻"
+    path = "benches/benchmark.hl"
 }
 
 [build]

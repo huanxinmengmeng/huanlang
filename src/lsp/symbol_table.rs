@@ -422,7 +422,7 @@ mod tests {
         table.add_symbol(symbol);
         
         assert!(table.find_symbol("变量").is_some());
-        assert_eq!(table.find_symbol("变量").unwrap().type_info, Some("整数".to_string()));
+        assert_eq!(table.find_symbol("变量").unwrap()._type_info, Some("整数".to_string()));
     }
 
     #[test]
@@ -463,7 +463,7 @@ mod tests {
         table.add_symbol(global_var);
         
         table.enter_scope();
-        
+
         let local_var = Symbol::new(
             "局部变量".to_string(),
             SymbolKind::Variable,
@@ -474,12 +474,12 @@ mod tests {
             ),
         );
         table.add_symbol(local_var);
-        
+
         assert!(table.is_in_current_scope("局部变量"));
-        assert!(table.is_in_current_scope("全局变量"));
-        
+        assert!(!table.is_in_current_scope("全局变量"));
+
         table.exit_scope();
-        
+
         assert!(!table.is_in_current_scope("局部变量"));
         assert!(table.is_in_current_scope("全局变量"));
     }

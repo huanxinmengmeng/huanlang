@@ -1,6 +1,6 @@
 [package]
 name = "features-example"
-version = "0.1.0"
+version = "0.3.0"
 
 [dependencies]
 网络 = { version = "0.3", optional = true }

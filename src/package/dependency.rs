@@ -15,7 +15,7 @@
 use serde::{Deserialize, Serialize};
 
 /// 依赖定义
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Dependency {
     /// 版本约束
     pub version: Option<String>,
@@ -91,7 +91,7 @@ pub enum DependencySource {
 }
 
 /// 依赖冲突
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DependencyConflict {
     /// 包名称
     pub package: String,

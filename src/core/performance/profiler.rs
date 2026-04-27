@@ -40,6 +40,7 @@ pub struct ScopedTimer<'a> {
 
 impl<'a> ScopedTimer<'a> {
     pub fn new(profiler: &'a Profiler, name: &str) -> Self {
+        profiler.start_timer(name);
         ScopedTimer {
             profiler,
             name: name.to_string(),

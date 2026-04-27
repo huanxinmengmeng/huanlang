@@ -60,7 +60,7 @@ pub use main::{start_server, LspMessage};
 use serde::{Serialize, Deserialize};
 
 /// LSP 位置
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Position {
     pub line: u32,
     pub character: u32,
@@ -73,7 +73,7 @@ impl Position {
 }
 
 /// LSP 范围
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Range {
     pub start: Position,
     pub end: Position,
