@@ -102,6 +102,8 @@ impl AstToMlirConverter {
             Item::Extern(_ext) => Err(ConversionError::Other("外部块转换".to_string())),
             Item::TypeAlias(_alias) => Err(ConversionError::Other("类型别名转换".to_string())),
             Item::Global(_global) => Err(ConversionError::Other("全局变量转换".to_string())),
+            Item::Peripheral(_peripheral) => Err(ConversionError::Other("外设定义转换".to_string())),
+            Item::MemoryLayout(_layout) => Err(ConversionError::Other("内存布局转换".to_string())),
         }
     }
     

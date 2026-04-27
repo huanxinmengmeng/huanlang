@@ -73,6 +73,8 @@ impl fmt::Display for SourceLocation {
 pub enum TestType {
     /// 单元测试
     Unit,
+    /// 集成测试
+    Integration,
     /// 基准测试
     Benchmark,
     /// 模糊测试

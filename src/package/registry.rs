@@ -16,6 +16,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use crate::package::error::{PackageError, PackageResult};
 use crate::package::manifest::PackageManifest;
 
@@ -95,7 +96,7 @@ pub struct UserInfo {
 pub struct ErrorResponse {
     pub code: u16,
     pub message: String,
-    pub details: Option<serde::Value>,
+    pub details: Option<Value>,
 }
 
 impl RegistryClient {
@@ -144,7 +145,8 @@ impl RegistryClient {
         file.read_to_end(&mut tarball)
             .map_err(|e| PackageError::io_error(&e.to_string(), Some(tarball_path)))?;
         
-        let tarball_base64 = base64::encode(&tarball);
+        use base64::{engine::general_purpose, Engine as _};
+        let tarball_base64 = general_purpose::STANDARD.encode(&tarball);
         
         let request = UploadRequest {
             package: manifest.clone(),

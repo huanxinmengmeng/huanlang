@@ -21,11 +21,3 @@ pub mod definition;
 pub mod references;
 pub mod rename;
 pub mod formatting;
-
-pub use initialize::*;
-pub use completion::*;
-pub use hover::*;
-pub use definition::*;
-pub use references::*;
-pub use rename::*;
-pub use formatting::*;

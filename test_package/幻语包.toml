@@ -1,0 +1,15 @@
+[package]
+name = "test_package"
+version = "0.1.0"
+edition = "1.2"
+authors = ["Your Name <you@example.com>"]
+description = "A new 幻语 project"
+license = "MIT"
+readme = "README.md"
+
+[lib]
+path = "src/lib.幻"
+
+[[bins]]
+name = "test_package"
+path = "src/main.幻"

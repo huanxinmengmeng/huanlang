@@ -13,18 +13,19 @@
 //! 工作区管理模块
 
 use std::path::Path;
-use std::fs;
 use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use crate::package::error::{PackageError, PackageResult};
 use crate::package::manifest::PackageManifest;
+use crate::package::dependency::Dependency;
 
 /// 工作区
 pub struct Workspace {
     root: String,
     config: WorkspaceConfig,
     members: HashMap<String, PackageManifest>,
-    dependencies: HashMap<String, crate::package::manifest::Dependency>,
+    dependencies: HashMap<String, Dependency>,
 }
 
 /// 工作区配置
@@ -34,8 +35,8 @@ pub struct WorkspaceConfig {
     pub exclude: Option<Vec<String>>,
     pub default_members: Option<Vec<String>>,
     pub resolver: Option<String>,
-    pub package: Option<serde::Value>,
-    pub dependencies: Option<std::collections::HashMap<String, crate::package::manifest::Dependency>>,
+    pub package: Option<Value>,
+    pub dependencies: Option<std::collections::HashMap<String, Dependency>>,
 }
 
 /// 工作区成员
@@ -65,13 +66,49 @@ impl Workspace {
         })?;
         
         // 转换为 workspace::WorkspaceConfig
+        let converted_deps = manifest_workspace.dependencies.map(|deps| {
+            deps.into_iter().map(|(name, dep)| {
+                let converted = match dep {
+                    crate::package::manifest::Dependency::Version(v) => {
+                        Dependency {
+                            version: Some(v),
+                            registry: None,
+                            path: None,
+                            git: None,
+                            branch: None,
+                            tag: None,
+                            rev: None,
+                            optional: None,
+                            features: None,
+                            default_features: None,
+                        }
+                    },
+                    crate::package::manifest::Dependency::Detailed(d) => {
+                        Dependency {
+                            version: d.version,
+                            registry: d.registry,
+                            path: d.path,
+                            git: d.git,
+                            branch: d.branch,
+                            tag: d.tag,
+                            rev: d.rev,
+                            optional: d.optional,
+                            features: d.features,
+                            default_features: None,
+                        }
+                    }
+                };
+                (name, converted)
+            }).collect()
+        });
+        
         let config = WorkspaceConfig {
             members: manifest_workspace.members.unwrap_or_default(),
             exclude: manifest_workspace.exclude,
             default_members: manifest_workspace.default_members,
             resolver: manifest_workspace.resolver,
             package: manifest_workspace.package,
-            dependencies: manifest_workspace.dependencies,
+            dependencies: converted_deps,
         };
         
         let mut members = HashMap::new();
@@ -161,7 +198,7 @@ impl Workspace {
         }
         
         // 从配置中移除
-        let member = self.members.get(name).unwrap();
+        let _member = self.members.get(name).unwrap();
         let path = self.find_member_path(name).unwrap_or_default();
         
         if let Some(index) = self.config.members.iter().position(|p| *p == path) {
@@ -178,13 +215,13 @@ impl Workspace {
     }
 
     /// 获取工作区依赖
-    pub fn get_dependencies(&self) -> &HashMap<String, crate::package::manifest::Dependency> {
+    pub fn get_dependencies(&self) -> &HashMap<String, Dependency> {
         &self.dependencies
     }
 
     /// 添加工作区依赖
     pub fn add_dependency(&mut self, name: &str, version: &str) -> PackageResult<()> {
-        let dependency = crate::package::manifest::Dependency {
+        let dependency = Dependency {
             version: Some(version.to_string()),
             registry: None,
             path: None,
@@ -228,7 +265,7 @@ impl Workspace {
     pub fn build(&self) -> PackageResult<()> {
         println!("构建工作区...");
         
-        for (name, manifest) in &self.members {
+        for (name, _manifest) in &self.members {
             println!("  构建: {}", name);
             // 这里应该调用构建命令
         }
@@ -240,7 +277,7 @@ impl Workspace {
     pub fn test(&self) -> PackageResult<()> {
         println!("测试工作区...");
         
-        for (name, manifest) in &self.members {
+        for (name, _manifest) in &self.members {
             println!("  测试: {}", name);
             // 这里应该调用测试命令
         }
@@ -252,7 +289,7 @@ impl Workspace {
     pub fn run(&self, command: &str) -> PackageResult<()> {
         println!("运行工作区命令: {}", command);
         
-        for (name, manifest) in &self.members {
+        for (name, _manifest) in &self.members {
             println!("  运行 {} 在 {}", command, name);
             // 这里应该调用相应命令
         }
@@ -422,6 +459,7 @@ impl FeatureManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     #[test]
     fn test_workspace() {

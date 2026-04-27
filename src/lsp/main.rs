@@ -12,14 +12,13 @@
 
 //! LSP 服务器主入口
 
-use std::io::{stdin, stdout, Write};
+use std::io::{stdin, stdout, Write, Read};
 use std::sync::Arc;
-use std::thread;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{self, Value};
 
-use crate::lsp::{LspServer, InitializeParams, ServerCapabilities};
+use crate::lsp::{LspServer, ServerCapabilities};
 
 /// LSP 消息类型
 #[derive(Debug, Deserialize, Serialize)]
@@ -40,7 +39,7 @@ pub struct InitializeResult {
 
 /// 启动 LSP 服务器
 pub fn start_server() {
-    let mut server = LspServer::new();
+    let server = LspServer::new();
     let server = Arc::new(std::sync::Mutex::new(server));
     
     println!("幻语 LSP 服务器已启动，等待客户端连接...");

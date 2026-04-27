@@ -15,7 +15,7 @@
 use std::collections::{HashMap, HashSet, BTreeSet};
 use std::hash::Hash;
 use crate::package::error::{PackageError, PackageResult};
-use crate::package::manifest::{PackageManifest, Dependency, DetailedDependency};
+use crate::package::manifest::{PackageManifest, Dependency};
 
 /// 版本号
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

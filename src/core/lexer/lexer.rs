@@ -437,7 +437,7 @@ impl Lexer {
                 } else if self.current_char() == Some('>') {
                     lexeme.push('>');
                     self.advance();
-                    TokenKind::Arrow
+                    TokenKind::FatArrow
                 } else {
                     TokenKind::Assign
                 }
@@ -752,11 +752,11 @@ mod tests {
 
     #[test]
     fn test_lex_cjk_identifiers() {
-        let source = "变量 中文变量 my_var _private_var";
+        let source = "数量 中文变量 my_var _private_var";
         let mut lexer = Lexer::new(source);
         let (tokens, errors) = lexer.tokenize();
         assert!(errors.is_empty());
-        assert_eq!(tokens[0].kind, TokenKind::Ident("变量".to_string()));
+        assert_eq!(tokens[0].kind, TokenKind::Ident("数量".to_string()));
         assert_eq!(tokens[1].kind, TokenKind::Ident("中文变量".to_string()));
         assert_eq!(tokens[2].kind, TokenKind::Ident("my_var".to_string()));
         assert_eq!(tokens[3].kind, TokenKind::Ident("_private_var".to_string()));
@@ -806,7 +806,7 @@ mod tests {
 
     #[test]
     fn test_lex_errors_unexpected_char() {
-        let source = r#"@ # $"#;
+        let source = "@ ` ~";
         let mut lexer = Lexer::new(source);
         let (_tokens, errors) = lexer.tokenize();
         assert_eq!(errors.len(), 3);

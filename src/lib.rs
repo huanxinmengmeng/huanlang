@@ -19,12 +19,8 @@ pub mod interpreter;
 pub mod lang_identity;
 pub mod file_format;
 pub mod test;
-
-#[cfg(feature = "llvm")]
-pub mod lsp;
-
-#[cfg(feature = "llvm")]
 pub mod package;
+pub mod lsp;
 
 pub use core::lexer::Lexer;
 pub use core::parser::Parser;

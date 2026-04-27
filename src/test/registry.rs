@@ -1,5 +1,6 @@
 // Copyright © 2026 幻心梦梦 (huanxinmengmeng)
 // Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
@@ -36,10 +37,79 @@ impl TestRegistry {
         &self.entries
     }
 
-    pub fn load_from(&mut self, _paths: &[PathBuf]) -> Result<usize, TestError> {
-        // 实际实现应该扫描目录、编译模块、收集测试
-        // 为演示，返回空
-        Ok(0)
+    pub fn load_from(&mut self, paths: &[PathBuf]) -> Result<usize, TestError> {
+        use std::fs;
+        
+        let mut count = 0;
+        
+        for path in paths {
+            if path.is_dir() {
+                // 递归扫描目录
+                if let Ok(entries) = fs::read_dir(path) {
+                    for entry in entries {
+                        if let Ok(entry) = entry {
+                            let entry_path = entry.path();
+                            if entry_path.is_dir() {
+                                // 递归处理子目录
+                                count += self.load_from(&[entry_path])?;
+                            } else if let Some(ext) = entry_path.extension() {
+                                if ext == "hl" || ext == "幻" {
+                                    // 发现 .hl 或 .幻 文件，注册为一个测试
+                                    let file_name = entry_path.file_name().unwrap().to_string_lossy().to_string();
+                                    let test_name = if file_name.ends_with(".hl") {
+                                        file_name.trim_end_matches(".hl").to_string()
+                                    } else {
+                                        file_name.trim_end_matches(".幻").to_string()
+                                    };
+                                    
+                                    self.register(TestEntry {
+                                        module: path.to_string_lossy().to_string(),
+                                        name: test_name,
+                                        location: SourceLocation {
+                                            file: entry_path.to_string_lossy().to_string(),
+                                            line: 1,
+                                            column: 1,
+                                        },
+                                        ignored: false,
+                                        ignore_reason: None,
+                                        serial: false,
+                                        test_type: TestType::Integration,
+                                    });
+                                    count += 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            } else if path.is_file() {
+                // 直接加载单个文件
+                let file_name = path.file_name().unwrap().to_string_lossy().to_string();
+                let test_name = if file_name.ends_with(".hl") {
+                    file_name.trim_end_matches(".hl").to_string()
+                } else if file_name.ends_with(".幻") {
+                    file_name.trim_end_matches(".幻").to_string()
+                } else {
+                    file_name
+                };
+                
+                self.register(TestEntry {
+                    module: path.parent().unwrap_or(path).to_string_lossy().to_string(),
+                    name: test_name,
+                    location: SourceLocation {
+                        file: path.to_string_lossy().to_string(),
+                        line: 1,
+                        column: 1,
+                    },
+                    ignored: false,
+                    ignore_reason: None,
+                    serial: false,
+                    test_type: TestType::Integration,
+                });
+                count += 1;
+            }
+        }
+        
+        Ok(count)
     }
 }
 

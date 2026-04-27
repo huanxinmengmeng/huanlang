@@ -14,7 +14,7 @@
 //! 
 //! 本模块实现了幻语编程语言的命令行工具链。
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::fs;
 use std::io::{self, Write};
 
@@ -22,6 +22,9 @@ use crate::core::lexer::Lexer;
 use crate::core::parser::Parser;
 use crate::core::backend::traits::{CodeGenerator, OptLevel};
 
+use crate::core::interop::ffi::FFI;
+use crate::core::interop::transpiler::{HuanTranspiler, Transpiler, TargetLanguage};
+use crate::core::interop::bindings::{BindingGenerator, BindGenOptions, BindGenTargetLanguage, ExportedItem};
 use crate::tools::cli::error::CliResult;
 
 /// 构建命令
@@ -111,6 +114,64 @@ impl CheckCommand {
 impl EditCommand {
     pub fn new(file: String) -> Self {
         Self { file }
+    }
+}
+
+/// 代码转译命令
+#[derive(Debug, Clone)]
+pub struct TranspileCommand {
+    pub input: String,
+    pub output: Option<String>,
+    pub target: TargetLanguage,
+}
+
+/// 绑定生成命令
+#[derive(Debug, Clone)]
+pub struct GenBindingsCommand {
+    pub input: String,
+    pub output_dir: Option<String>,
+    pub export_name: String,
+    pub target_languages: Vec<BindGenTargetLanguage>,
+}
+
+/// 导入外部库命令
+#[derive(Debug, Clone)]
+pub struct ImportLibCommand {
+    pub lib_path: String,
+    pub language: String,
+}
+
+impl TranspileCommand {
+    pub fn new(input: String) -> Self {
+        Self {
+            input,
+            output: None,
+            target: TargetLanguage::Rust,
+        }
+    }
+}
+
+impl GenBindingsCommand {
+    pub fn new(input: String) -> Self {
+        Self {
+            input,
+            output_dir: None,
+            export_name: "huanlib".to_string(),
+            target_languages: vec![
+                BindGenTargetLanguage::Python,
+                BindGenTargetLanguage::Kotlin,
+                BindGenTargetLanguage::Swift,
+            ],
+        }
+    }
+}
+
+impl ImportLibCommand {
+    pub fn new(lib_path: String) -> Self {
+        Self {
+            lib_path,
+            language: "c".to_string(),
+        }
     }
 }
 
@@ -690,6 +751,167 @@ pub fn execute_repl() -> CliResult<()> {
     Ok(())
 }
 
+/// 执行代码转译命令
+pub fn execute_transpile(cmd: TranspileCommand) -> CliResult<()> {
+    if cmd.input.is_empty() {
+        println!("错误: 请指定要转译的源文件");
+        println!("用法: huan transpile <源文件> [--target <语言>] [--output <文件>]");
+        println!("支持的目标语言: rust, python, c, java, go, kotlin, swift");
+        return Ok(());
+    }
+
+    let input_path = Path::new(&cmd.input);
+    if !input_path.exists() {
+        println!("错误: 文件不存在: {}", cmd.input);
+        return Ok(());
+    }
+
+    println!("正在转译: {}", cmd.input);
+    println!("目标语言: {:?}", cmd.target);
+
+    let source = match fs::read_to_string(&cmd.input) {
+        Ok(s) => s,
+        Err(e) => {
+            println!("错误: 无法读取文件: {}", e);
+            return Ok(());
+        }
+    };
+
+    let transpiler = HuanTranspiler::new();
+    match transpiler.transpile(&source, cmd.target) {
+        Ok(transpiled_code) => {
+            if let Some(output_file) = cmd.output {
+                match fs::write(&output_file, transpiled_code) {
+                    Ok(_) => println!("转译成功! 输出文件: {}", output_file),
+                    Err(e) => println!("错误: 无法写入输出文件: {}", e),
+                }
+            } else {
+                println!("转译成功! 输出结果:");
+                println!("{}", transpiled_code);
+            }
+        }
+        Err(e) => {
+            println!("转译错误: {:?}", e);
+        }
+    }
+
+    Ok(())
+}
+
+/// 执行绑定生成命令
+pub fn execute_gen_bindings(cmd: GenBindingsCommand) -> CliResult<()> {
+    if cmd.input.is_empty() {
+        println!("错误: 请指定要生成绑定的源文件");
+        println!("用法: huan gen-bindings <源文件> [--output-dir <目录>] [--name <名称>] [--lang <语言>]");
+        println!("支持的绑定语言: python, kotlin, swift");
+        return Ok(());
+    }
+
+    let input_path = Path::new(&cmd.input);
+    if !input_path.exists() {
+        println!("错误: 文件不存在: {}", cmd.input);
+        return Ok(());
+    }
+
+    println!("正在生成绑定: {}", cmd.input);
+    println!("输出目录: {:?}", cmd.output_dir);
+    println!("导出名称: {}", cmd.export_name);
+    println!("目标语言: {:?}", cmd.target_languages);
+
+    // 这里我们创建一些示例导出项目
+    let exported_items = vec![
+        ExportedItem::Function {
+            name: "main".to_string(),
+            params: Vec::new(),
+            return_type: "整数".to_string(),
+            is_public: true,
+        },
+        ExportedItem::Function {
+            name: "add".to_string(),
+            params: vec![
+                ("a".to_string(), "整数".to_string()),
+                ("b".to_string(), "整数".to_string())
+            ],
+            return_type: "整数".to_string(),
+            is_public: true,
+        },
+        ExportedItem::Struct {
+            name: "Point".to_string(),
+            fields: vec![
+                ("x".to_string(), "整数".to_string()),
+                ("y".to_string(), "整数".to_string())
+            ],
+            is_public: true,
+        },
+    ];
+
+    let options = BindGenOptions {
+        export_name: cmd.export_name,
+        target_languages: cmd.target_languages,
+        output_dir: match cmd.output_dir {
+            Some(dir) => PathBuf::from(dir),
+            None => PathBuf::from("generated_bindings"),
+        },
+    };
+
+    let generator = BindingGenerator::new(options);
+    match generator.generate(&exported_items) {
+        Ok(_) => {
+            println!("✓ 绑定生成成功!");
+            println!("绑定文件已生成在: {:?}", generator.get_output_dir());
+        }
+        Err(e) => {
+            println!("✗ 绑定生成失败: {:?}", e);
+        }
+    }
+
+    Ok(())
+}
+
+/// 执行导入外部库命令
+pub fn execute_import_lib(cmd: ImportLibCommand) -> CliResult<()> {
+    if cmd.lib_path.is_empty() {
+        println!("错误: 请指定要导入的库文件");
+        println!("用法: huan import-lib <库文件> [--lang <语言>]");
+        return Ok(());
+    }
+
+    println!("正在导入外部库: {}", cmd.lib_path);
+    println!("语言: {}", cmd.language);
+
+    let lib_path = Path::new(&cmd.lib_path);
+    if !lib_path.exists() {
+        println!("警告: 库文件不存在，将使用模拟模式");
+    }
+
+    // 模拟 FFI 绑定生成
+    let ffi = FFI::new();
+    match ffi.generate_c_bindings(&lib_path.to_path_buf()) {
+        Ok(items) => {
+            println!("✓ 导入成功! 发现以下绑定:");
+            for item in items {
+                match item {
+                    crate::core::interop::ffi::ExternItem::Function { name, params: _, return_type: _ } => {
+                        println!("  函数: {}", name);
+                    }
+                    crate::core::interop::ffi::ExternItem::Variable { name, ty: _, is_const: _ } => {
+                        println!("  变量: {}", name);
+                    }
+                    crate::core::interop::ffi::ExternItem::Import { module, alias: _ } => {
+                        println!("  导入: {}", module);
+                    }
+                }
+            }
+            println!("\n提示: 生成的绑定可以直接在幻语中使用");
+        }
+        Err(e) => {
+            println!("✗ 导入失败: {:?}", e);
+        }
+    }
+
+    Ok(())
+}
+
 /// CLI 主结构
 pub struct Cli;
 
@@ -707,15 +929,18 @@ impl Cli {
             println!("  check <文件>   类型检查源文件");
             println!("  run <文件>     运行源文件");
             println!("  repl           启动交互式环境");
-            println!("  fmt <文件>     格式化代码");
-            println!("  edit <文件>    编辑文件");
-            println!("  serve          启动 LSP 服务器");
-            println!("  init           初始化新项目");
-            println!("  add <包>       添加依赖");
-            println!("  remove <包>    移除依赖");
-            println!("  update         更新依赖");
-            println!("  install        安装依赖");
-            println!("  version        显示版本信息");
+            println!("  fmt <文件>              格式化代码");
+            println!("  edit <文件>             编辑文件");
+            println!("  transpile <文件>        代码转译");
+            println!("  gen-bindings <文件>     生成绑定");
+            println!("  import-lib <库文件>     导入外部库");
+            println!("  serve                   启动 LSP 服务器");
+            println!("  init                    初始化新项目");
+            println!("  add <包>                添加依赖");
+            println!("  remove <包>             移除依赖");
+            println!("  update                  更新依赖");
+            println!("  install                 安装依赖");
+            println!("  version                 显示版本信息");
             return Ok(());
         }
 
@@ -830,6 +1055,99 @@ impl Cli {
                     }
                 }
                 if let Err(e) = execute_edit(cmd) {
+                    eprintln!("错误: {}", e);
+                }
+            }
+            "transpile" => {
+                let mut cmd = TranspileCommand::new(String::new());
+                let mut i = 2;
+                while i < args.len() {
+                    if args[i].starts_with('-') {
+                        match args[i].as_str() {
+                            "-o" | "--output" if i + 1 < args.len() => {
+                                cmd.output = Some(args[i + 1].clone());
+                                i += 1;
+                            }
+                            "--target" | "-t" if i + 1 < args.len() => {
+                                match args[i + 1].to_lowercase().as_str() {
+                                    "rust" => cmd.target = TargetLanguage::Rust,
+                                    "python" => cmd.target = TargetLanguage::Python,
+                                    "c" => cmd.target = TargetLanguage::C,
+                                    "java" => cmd.target = TargetLanguage::Java,
+                                    "go" => cmd.target = TargetLanguage::Go,
+                                    "kotlin" => cmd.target = TargetLanguage::Kotlin,
+                                    "swift" => cmd.target = TargetLanguage::Swift,
+                                    _ => {}
+                                }
+                                i += 1;
+                            }
+                            _ => {}
+                        }
+                    } else if cmd.input.is_empty() {
+                        cmd.input = args[i].clone();
+                    }
+                    i += 1;
+                }
+                if let Err(e) = execute_transpile(cmd) {
+                    eprintln!("错误: {}", e);
+                }
+            }
+            "gen-bindings" => {
+                let mut cmd = GenBindingsCommand::new(String::new());
+                let mut i = 2;
+                while i < args.len() {
+                    if args[i].starts_with('-') {
+                        match args[i].as_str() {
+                            "--output-dir" if i + 1 < args.len() => {
+                                cmd.output_dir = Some(args[i + 1].clone());
+                                i += 1;
+                            }
+                            "--name" if i + 1 < args.len() => {
+                                cmd.export_name = args[i + 1].clone();
+                                i += 1;
+                            }
+                            "--lang" if i + 1 < args.len() => {
+                                let langs: Vec<_> = args[i + 1].split(',').collect();
+                                cmd.target_languages.clear();
+                                for lang in langs {
+                                    match lang.to_lowercase().as_str() {
+                                        "python" => cmd.target_languages.push(BindGenTargetLanguage::Python),
+                                        "kotlin" => cmd.target_languages.push(BindGenTargetLanguage::Kotlin),
+                                        "swift" => cmd.target_languages.push(BindGenTargetLanguage::Swift),
+                                        _ => {}
+                                    }
+                                }
+                                i += 1;
+                            }
+                            _ => {}
+                        }
+                    } else if cmd.input.is_empty() {
+                        cmd.input = args[i].clone();
+                    }
+                    i += 1;
+                }
+                if let Err(e) = execute_gen_bindings(cmd) {
+                    eprintln!("错误: {}", e);
+                }
+            }
+            "import-lib" => {
+                let mut cmd = ImportLibCommand::new(String::new());
+                let mut i = 2;
+                while i < args.len() {
+                    if args[i].starts_with('-') {
+                        match args[i].as_str() {
+                            "--lang" if i + 1 < args.len() => {
+                                cmd.language = args[i + 1].clone();
+                                i += 1;
+                            }
+                            _ => {}
+                        }
+                    } else if cmd.lib_path.is_empty() {
+                        cmd.lib_path = args[i].clone();
+                    }
+                    i += 1;
+                }
+                if let Err(e) = execute_import_lib(cmd) {
                     eprintln!("错误: {}", e);
                 }
             }

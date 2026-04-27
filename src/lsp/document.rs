@@ -31,19 +31,19 @@ pub struct Document {
     /// 文档 URI
     pub uri: String,
     /// 文档版本号
-    pub version: i32,
+    pub _version: i32,
     /// 文档内容（Rope 文本缓冲区，支持高效的增量更新）
     pub content: Rope,
     /// 语法树（AST）
-    pub ast: Option<crate::core::ast::Program>,
+    pub _ast: Option<crate::core::ast::Program>,
     /// 文档符号列表
-    pub symbols: Vec<DocumentSymbol>,
+    pub _symbols: Vec<DocumentSymbol>,
     /// 诊断信息
-    pub diagnostics: Vec<crate::lsp::diagnostics::Diagnostic>,
+    pub _diagnostics: Vec<crate::lsp::diagnostics::Diagnostic>,
     /// 最后修改时间
-    pub last_modified: SystemTime,
+    pub _last_modified: SystemTime,
     /// 依赖的其他文档
-    pub dependencies: Vec<String>,
+    pub _dependencies: Vec<String>,
 }
 
 impl Document {
@@ -51,21 +51,21 @@ impl Document {
     pub fn new(uri: String, content: String) -> Self {
         Document {
             uri,
-            version: 1,
+            _version: 1,
             content: Rope::from_str(&content),
-            ast: None,
-            symbols: Vec::new(),
-            diagnostics: Vec::new(),
-            last_modified: SystemTime::now(),
-            dependencies: Vec::new(),
+            _ast: None,
+            _symbols: Vec::new(),
+            _diagnostics: Vec::new(),
+            _last_modified: SystemTime::now(),
+            _dependencies: Vec::new(),
         }
     }
 
     /// 更新文档内容
     pub fn update_content(&mut self, content: String) {
         self.content = Rope::from_str(&content);
-        self.version += 1;
-        self.last_modified = SystemTime::now();
+        self._version += 1;
+        self._last_modified = SystemTime::now();
     }
 
     /// 获取行数
@@ -163,28 +163,33 @@ impl Document {
     }
 
     /// 设置语法树
+    #[allow(dead_code)]
     pub fn set_ast(&mut self, ast: crate::core::ast::Program) {
-        self.ast = Some(ast);
+        self._ast = Some(ast);
     }
 
     /// 设置诊断信息
+    #[allow(dead_code)]
     pub fn set_diagnostics(&mut self, diagnostics: Vec<crate::lsp::diagnostics::Diagnostic>) {
-        self.diagnostics = diagnostics;
+        self._diagnostics = diagnostics;
     }
 
     /// 添加诊断信息
+    #[allow(dead_code)]
     pub fn add_diagnostic(&mut self, diagnostic: crate::lsp::diagnostics::Diagnostic) {
-        self.diagnostics.push(diagnostic);
+        self._diagnostics.push(diagnostic);
     }
 
     /// 清空诊断信息
+    #[allow(dead_code)]
     pub fn clear_diagnostics(&mut self) {
-        self.diagnostics.clear();
+        self._diagnostics.clear();
     }
 
     /// 检查文档是否有错误
+    #[allow(dead_code)]
     pub fn has_errors(&self) -> bool {
-        self.diagnostics.iter().any(|d| d.severity == crate::lsp::diagnostics::DiagnosticSeverity::Error)
+        self._diagnostics.iter().any(|d| d.severity == crate::lsp::diagnostics::DiagnosticSeverity::Error)
     }
 }
 
@@ -267,8 +272,8 @@ impl DocumentManager {
     pub fn open_document(&mut self, uri: String, content: String) -> &mut Document {
         let doc = Document::new(uri.clone(), content);
         self.documents.insert(uri.clone(), doc);
-        self.active_document = Some(uri);
-        self.documents.get_mut(&uri.clone()).unwrap()
+        self.active_document = Some(uri.clone());
+        self.documents.get_mut(&uri).unwrap()
     }
 
     /// 关闭文档

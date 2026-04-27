@@ -14,8 +14,7 @@
 
 use std::env;
 use std::path::Path;
-use std::process;
-use crate::package::error::{PackageError, PackageResult};
+use crate::package::error::PackageError;
 use crate::package::manifest::PackageManifest;
 use crate::package::lockfile::PackageLock;
 use crate::package::resolver::DependencyResolver;
@@ -201,8 +200,10 @@ impl Command {
 
     /// 初始化项目
     fn init(&self) -> CommandResult {
-        let name = self.args.args.first().unwrap_or(&"my-project".to_string());
-        let edition = self.args.options.get("edition").unwrap_or(&"1.2".to_string());
+        let default_name = "my-project".to_string();
+        let default_edition = "1.2".to_string();
+        let name = self.args.args.first().unwrap_or(&default_name);
+        let edition = self.args.options.get("edition").unwrap_or(&default_edition);
         
         let manifest = PackageManifest {
             package: crate::package::manifest::PackageInfo {
@@ -405,7 +406,7 @@ impl Command {
                 // 从注册表获取
                 println!("    从注册表下载...");
                 let client = RegistryClient::new("https://registry.huanlang.org", None);
-                let package_info = client.get_package_version(name, &package.version)?;
+                let _package_info = client.get_package_version(name, &package.version)?;
                 
                 // 模拟下载包内容
                 let content = format!("Package {} v{}", name, package.version).as_bytes().to_vec();

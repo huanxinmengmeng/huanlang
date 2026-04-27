@@ -1,5 +1,6 @@
 // Copyright © 2026 幻心梦梦 (huanxinmengmeng)
 // Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
@@ -97,7 +98,6 @@ impl TestRunner {
                     continue;
                 }
                 if self.config.only_ignored {
-                    // 仅运行被忽略的测试
                 }
             } else if self.config.only_ignored {
                 continue;
@@ -227,35 +227,31 @@ impl TestRunner {
         
         let start = Instant::now();
         
-        let result = if test.ignored {
+        if test.ignored {
             let ignore_reason = test.ignore_reason.clone();
-            ResultItem::ignored(test, ignore_reason)
-        } else {
-            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                // 这里应该实际调用测试函数
-                // 为演示，直接返回通过
-                Ok::<(), crate::test::error::TestError>(())
-            }));
-            
-            let duration = start.elapsed();
-            
-            match result {
-                Ok(Ok(())) => ResultItem::passed(test, duration),
-                Ok(Err(e)) => ResultItem::failed(test, duration, format!("测试失败: {:?}", e), None),
-                Err(e) => {
-                    let msg = if let Some(s) = e.downcast_ref::<&str>() {
-                        s.to_string()
-                    } else if let Some(s) = e.downcast_ref::<String>() {
-                        s.clone()
-                    } else {
-                        "未知错误".to_string()
-                    };
-                    ResultItem::failed(test, duration, msg, None)
-                }
-            }
-        };
+            return ResultItem::ignored(test, ignore_reason);
+        }
         
-        result
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            run_huan_test(&test.location.file)
+        }));
+        
+        let duration = start.elapsed();
+        
+        match result {
+            Ok(Ok(())) => ResultItem::passed(test, duration),
+            Ok(Err(e)) => ResultItem::failed(test, duration, format!("测试失败: {:?}", e), None),
+            Err(e) => {
+                let msg = if let Some(s) = e.downcast_ref::<&str>() {
+                    s.to_string()
+                } else if let Some(s) = e.downcast_ref::<String>() {
+                    s.clone()
+                } else {
+                    "未知错误".to_string()
+                };
+                ResultItem::failed(test, duration, msg, None)
+            }
+        }
     }
 
     fn print_test_result(&self, result: &ResultItem) {
@@ -268,7 +264,7 @@ impl TestRunner {
         match result.status {
             TestStatus::Passed => {
                 if self.config.report_time {
-                    println!("测试 {} ... 通过 ({:.2}ms)", full_name, result.duration.as_secs_f64() * 1000.0);
+                    println!("测试 {} ... 通过 ({:.2} ms)", full_name, result.duration.as_secs_f64() * 1000.0);
                 } else {
                     println!("测试 {} ... 通过", full_name);
                 }
@@ -292,14 +288,14 @@ impl TestRunner {
             }
             TestStatus::Fuzzed => {
                 if self.config.report_time {
-                    println!("测试 {} ... 模糊测试通过 ({:.2}ms)", full_name, result.duration.as_secs_f64() * 1000.0);
+                    println!("测试 {} ... 模糊测试通过 ({:.2} ms)", full_name, result.duration.as_secs_f64() * 1000.0);
                 } else {
                     println!("测试 {} ... 模糊测试通过", full_name);
                 }
             }
             TestStatus::Property => {
                 if self.config.report_time {
-                    println!("测试 {} ... 属性测试通过 ({:.2}ms)", full_name, result.duration.as_secs_f64() * 1000.0);
+                    println!("测试 {} ... 属性测试通过 ({:.2} ms)", full_name, result.duration.as_secs_f64() * 1000.0);
                 } else {
                     println!("测试 {} ... 属性测试通过", full_name);
                 }
@@ -315,9 +311,50 @@ impl TestRunner {
 
 type ResultItem = TestResult;
 
+fn run_huan_test(file_path: &str) -> crate::test::error::TestResult<()> {
+    use std::fs;
+    use std::path::Path;
+    
+    let path = Path::new(file_path);
+    
+    if !path.exists() {
+        return Err(crate::test::error::TestError::IoError {
+            message: "文件不存在".to_string(),
+            file: file_path.to_string(),
+            line: 1,
+            column: 1,
+        });
+    }
+    
+    let source = fs::read_to_string(path).map_err(|e| {
+        crate::test::error::TestError::IoError {
+            message: format!("无法读取测试文件: {}", e),
+            file: file_path.to_string(),
+            line: 1,
+            column: 1,
+        }
+    })?;
+    
+    let mut interpreter = crate::interpreter::Interpreter::new();
+    
+    interpreter.run_source(&source).map_err(|e| {
+        crate::test::error::TestError::Failed {
+            message: format!("解释器运行失败: {}", e),
+        }
+    })?;
+    
+    Ok(())
+}
+
 fn run_single_internal(test: &Test, _config: TestConfig) -> ResultItem {
     let start = Instant::now();
+    
+    let result = run_huan_test(&test.location.file);
+    
     let duration = start.elapsed();
     
-    ResultItem::passed(test.clone(), duration)
+    match result {
+        Ok(()) => ResultItem::passed(test.clone(), duration),
+        Err(e) => ResultItem::failed(test.clone(), duration, format!("{}", e), None),
+    }
 }

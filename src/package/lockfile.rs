@@ -16,7 +16,7 @@ use std::path::Path;
 use std::fs;
 use serde::{Deserialize, Serialize};
 use crate::package::error::{PackageError, PackageResult};
-use crate::package::resolver::{Version, ResolutionResult, VersionConstraint};
+use crate::package::resolver::ResolutionResult;
 
 /// 锁定文件
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -238,6 +238,8 @@ impl PackageLock {
 mod tests {
     use super::*;
     use crate::package::resolver::DependencyResolver;
+    use crate::package::resolver::Version;
+    use crate::package::dependency::VersionConstraint;
 
     #[test]
     fn test_lock_file_creation() {

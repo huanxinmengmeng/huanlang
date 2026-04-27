@@ -15,6 +15,8 @@
 use std::path::Path;
 use std::fs;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::collections::HashMap;
 use crate::package::error::PackageError;
 
 use crate::package::security::PackageSignature;
@@ -51,9 +53,9 @@ pub struct PackageManifest {
     /// 工作区配置
     pub workspace: Option<WorkspaceConfig>,
     /// 补丁配置
-    pub patch: Option<serde::Value>,
+    pub patch: Option<Value>,
     /// 替换配置
-    pub replace: Option<serde::Value>,
+    pub replace: Option<Value>,
     /// 功能标志
     pub features: Option<HashMap<String, Vec<String>>>,
     /// 包签名
@@ -242,14 +244,12 @@ pub struct WorkspaceConfig {
     pub exclude: Option<Vec<String>>,
     pub default_members: Option<Vec<String>>,
     pub resolver: Option<String>,
-    pub package: Option<serde::Value>,
+    pub package: Option<Value>,
     pub dependencies: Option<HashMap<String, Dependency>>,
 }
 
 /// 结果类型
 pub type PackageResult<T> = std::result::Result<T, PackageError>;
-
-use std::collections::HashMap;
 
 impl PackageManifest {
     /// 从文件加载

@@ -112,8 +112,15 @@ const KEYWORD_TRIPLES: &[(&str, &str, &str, TokenKind)] = &[
     ("段", "duan", "section", TokenKind::Section),
     ("对齐", "duiqi", "align", TokenKind::Align),
     ("外部", "waibu", "extern", TokenKind::Extern),
-    ("类型", "leixing", "type", TokenKind::Type),
+    ("类型定义", "leixingdingyi", "type", TokenKind::Type),
     ("可变", "kebian", "mut", TokenKind::Mut),
+    
+    // 裸机编程关键词
+    ("外设", "waishu", "peripheral", TokenKind::Peripheral),
+    ("寄存器", "jicunqi", "register", TokenKind::Register),
+    ("内存", "neicun", "memory", TokenKind::Memory),
+    ("布局", "buju", "layout", TokenKind::Layout),
+    ("段定义", "duandingyi", "segment", TokenKind::Segment),
     
     // 类型关键词
     ("整数", "zhengshu", "int", TokenKind::TypeInt),
@@ -296,6 +303,11 @@ impl KeywordStyleConverter {
                 | TokenKind::Global
                 | TokenKind::Section
                 | TokenKind::Align
+                | TokenKind::Peripheral
+                | TokenKind::Register
+                | TokenKind::Memory
+                | TokenKind::Layout
+                | TokenKind::Segment
                 | TokenKind::Extern
                 | TokenKind::Type
                 | TokenKind::Mut

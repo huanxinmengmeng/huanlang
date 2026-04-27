@@ -12,11 +12,10 @@
 
 //! 补全请求处理器
 
-use crate::lsp::{Position, Range, Location};
-use std::collections::HashMap;
+use crate::lsp::Position;
 
 /// 补全项类型
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum CompletionItemKind {
     Text,
     Method,
@@ -46,7 +45,7 @@ impl Default for CompletionItemKind {
 }
 
 /// 补全项
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CompletionItem {
     /// 显示标签
     pub label: String,
@@ -110,7 +109,7 @@ impl CompletionItem {
 }
 
 /// 插入文本格式
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum InsertTextFormat {
     PlainText,
     Snippet,
@@ -123,7 +122,7 @@ impl Default for InsertTextFormat {
 }
 
 /// 幻语同义词
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct HuanSynonyms {
     /// 中文关键词
     pub chinese: String,
@@ -145,7 +144,7 @@ impl HuanSynonyms {
 }
 
 /// 补全请求参数
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CompletionParams {
     /// 文本文档标识符
     pub text_document: TextDocumentIdentifier,
@@ -158,7 +157,7 @@ pub struct CompletionParams {
 }
 
 /// 文本文档标识符
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TextDocumentIdentifier {
     pub uri: String,
 }
@@ -170,7 +169,7 @@ impl TextDocumentIdentifier {
 }
 
 /// 补全上下文
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CompletionContext {
     /// 触发方式
     pub trigger_kind: CompletionTriggerKind,
@@ -179,7 +178,7 @@ pub struct CompletionContext {
 }
 
 /// 补全触发方式
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum CompletionTriggerKind {
     Invoked,
     TriggerCharacter,
@@ -335,15 +334,15 @@ impl CompletionHandler {
         vec![
             CompletionItem::new("函数模板".to_string(), CompletionItemKind::Snippet)
                 .with_detail("完整的函数定义".to_string())
-                .with_documentation("插入一个完整的函数模板")
+                .with_documentation("插入一个完整的函数模板".to_string())
                 .with_insert_text("函数 ${1:函数名}(${2:参数}) 返回 ${3:类型}\n    ${4:// 函数体}\n结束".to_string()),
             CompletionItem::new("条件语句".to_string(), CompletionItemKind::Snippet)
                 .with_detail("完整的条件语句".to_string())
-                .with_documentation("插入一个完整的条件语句模板")
+                .with_documentation("插入一个完整的条件语句模板".to_string())
                 .with_insert_text("若 ${1:条件} 那么\n    ${2:// 代码}\n结束".to_string()),
             CompletionItem::new("循环语句".to_string(), CompletionItemKind::Snippet)
                 .with_detail("完整的循环语句".to_string())
-                .with_documentation("插入一个完整的循环语句模板")
+                .with_documentation("插入一个完整的循环语句模板".to_string())
                 .with_insert_text("循环 ${1:次数}\n    ${2:// 代码}\n结束".to_string()),
         ]
     }

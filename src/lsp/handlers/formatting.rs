@@ -12,7 +12,7 @@
 
 //! 格式化请求处理器
 
-use crate::lsp::{Range, Position};
+use crate::lsp::Range;
 
 /// 格式化请求参数
 #[derive(Debug, Clone)]
@@ -95,7 +95,7 @@ pub struct FormattingHandler;
 
 impl FormattingHandler {
     /// 处理格式化请求
-    pub fn handle(params: FormattingParams) -> FormattingResult {
+    pub fn handle(_params: FormattingParams) -> FormattingResult {
         // 这里应该：
         // 1. 解析文档内容
         // 2. 应用格式化规则
@@ -106,7 +106,7 @@ impl FormattingHandler {
     }
 
     /// 处理范围格式化请求
-    pub fn handle_range(params: RangeFormattingParams) -> FormattingResult {
+    pub fn handle_range(_params: RangeFormattingParams) -> FormattingResult {
         // 这里应该只格式化指定范围
         
         // 简化实现：返回空列表
@@ -136,8 +136,8 @@ impl KeywordStyleHandler {
     /// 处理关键词风格转换请求
     pub fn convert(
         content: &str,
-        from_style: KeywordStyle,
-        to_style: KeywordStyle,
+        _from_style: KeywordStyle,
+        _to_style: KeywordStyle,
     ) -> String {
         // 这里应该：
         // 1. 解析内容
@@ -152,6 +152,7 @@ impl KeywordStyleHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lsp::Position;
 
     #[test]
     fn test_formatting_options_default() {

@@ -19,7 +19,7 @@ pub struct InitializeHandler;
 
 impl InitializeHandler {
     /// 处理初始化请求
-    pub fn handle(params: InitializeParams) -> InitializeResult {
+    pub fn handle(_params: InitializeParams) -> InitializeResult {
         // 创建服务器能力集
         let capabilities = ServerCapabilities::default();
         

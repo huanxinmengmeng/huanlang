@@ -18,7 +18,7 @@
 //! - 所有权错误
 //! - 静态分析警告
 
-use crate::lsp::{Position, Range, Location};
+use crate::lsp::{Range, Location};
 
 /// 诊断严重程度
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -165,7 +165,7 @@ pub struct DiagnosticGenerator {
     /// 诊断列表
     diagnostics: Vec<Diagnostic>,
     /// 源文件 URI
-    uri: String,
+    _uri: String,
 }
 
 impl DiagnosticGenerator {
@@ -173,7 +173,7 @@ impl DiagnosticGenerator {
     pub fn new(uri: String) -> Self {
         DiagnosticGenerator {
             diagnostics: Vec::new(),
-            uri,
+            _uri: uri,
         }
     }
 
@@ -280,7 +280,7 @@ pub mod codes {
 // 常见的错误诊断生成辅助函数
 
 /// 生成"未定义变量"诊断
-pub fn undefined_variable(uri: &str, range: Range, name: &str) -> Diagnostic {
+pub fn undefined_variable(_uri: &str, range: Range, name: &str) -> Diagnostic {
     Diagnostic::new(
         range,
         DiagnosticSeverity::Error,
@@ -292,7 +292,7 @@ pub fn undefined_variable(uri: &str, range: Range, name: &str) -> Diagnostic {
 }
 
 /// 生成"类型不匹配"诊断
-pub fn type_mismatch(uri: &str, range: Range, expected: &str, actual: &str) -> Diagnostic {
+pub fn type_mismatch(_uri: &str, range: Range, expected: &str, actual: &str) -> Diagnostic {
     Diagnostic::new(
         range,
         DiagnosticSeverity::Error,
@@ -304,7 +304,7 @@ pub fn type_mismatch(uri: &str, range: Range, expected: &str, actual: &str) -> D
 }
 
 /// 生成"未闭合块"诊断
-pub fn unclosed_block(uri: &str, range: Range) -> Diagnostic {
+pub fn unclosed_block(_uri: &str, range: Range) -> Diagnostic {
     Diagnostic::new(
         range,
         DiagnosticSeverity::Error,
@@ -316,7 +316,7 @@ pub fn unclosed_block(uri: &str, range: Range) -> Diagnostic {
 }
 
 /// 生成"未使用变量"诊断
-pub fn unused_variable(uri: &str, range: Range, name: &str) -> Diagnostic {
+pub fn unused_variable(_uri: &str, range: Range, name: &str) -> Diagnostic {
     Diagnostic::new(
         range,
         DiagnosticSeverity::Warning,
@@ -328,7 +328,7 @@ pub fn unused_variable(uri: &str, range: Range, name: &str) -> Diagnostic {
 }
 
 /// 生成"建议使用不可变变量"诊断
-pub fn suggest_immutable(uri: &str, range: Range, name: &str) -> Diagnostic {
+pub fn suggest_immutable(_uri: &str, range: Range, name: &str) -> Diagnostic {
     Diagnostic::new(
         range,
         DiagnosticSeverity::Warning,
@@ -342,6 +342,7 @@ pub fn suggest_immutable(uri: &str, range: Range, name: &str) -> Diagnostic {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lsp::Position;
 
     #[test]
     fn test_diagnostic_creation() {

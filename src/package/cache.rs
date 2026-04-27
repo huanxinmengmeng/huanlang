@@ -14,7 +14,6 @@
 
 use std::path::Path;
 use std::fs;
-use std::io;
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use crate::package::error::{PackageError, PackageResult};
@@ -25,6 +24,7 @@ pub struct CacheManager {
     cache_dir: String,
     index_dir: String,
     package_dir: String,
+    #[allow(dead_code)]
     temp_dir: String,
 }
 
@@ -154,7 +154,7 @@ impl CacheManager {
                 if let Ok(entry) = entry {
                     let path = entry.path();
                     if path.is_dir() {
-                        let package_name = path.file_name().unwrap().to_str().unwrap();
+                        let _package_name = path.file_name().unwrap().to_str().unwrap();
                         
                         // 遍历版本目录
                         if let Ok(version_entries) = fs::read_dir(&path) {

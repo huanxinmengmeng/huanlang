@@ -21,3 +21,4 @@ pub mod asm;
 pub mod mlir;
 pub mod backend;
 pub mod interop;
+pub mod performance;

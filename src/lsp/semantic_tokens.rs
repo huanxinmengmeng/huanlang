@@ -23,7 +23,7 @@
 //! - 注释
 //! - 运算符
 
-use crate::lsp::{Position, Range};
+use crate::lsp::Range;
 
 /// 语义标记类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -50,6 +50,7 @@ pub enum SemanticTokenType {
     Event,
     Operator,
     Decorator,
+    Keyword,
 }
 
 impl SemanticTokenType {
@@ -78,6 +79,7 @@ impl SemanticTokenType {
             SemanticTokenType::Event => "event",
             SemanticTokenType::Operator => "operator",
             SemanticTokenType::Decorator => "decorator",
+            SemanticTokenType::Keyword => "keyword",
         }
     }
 
@@ -106,6 +108,7 @@ impl SemanticTokenType {
             "event" => Some(SemanticTokenType::Event),
             "operator" => Some(SemanticTokenType::Operator),
             "decorator" => Some(SemanticTokenType::Decorator),
+            "keyword" => Some(SemanticTokenType::Keyword),
             _ => None,
         }
     }
@@ -242,6 +245,7 @@ impl SemanticToken {
             SemanticTokenType::Event => 19,
             SemanticTokenType::Operator => 20,
             SemanticTokenType::Decorator => 21,
+            SemanticTokenType::Keyword => 22,
         }
     }
 
@@ -513,6 +517,7 @@ impl HuanKeywords {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lsp::Position;
 
     #[test]
     fn test_semantic_token_creation() {

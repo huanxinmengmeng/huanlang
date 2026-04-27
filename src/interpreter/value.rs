@@ -22,6 +22,7 @@ pub enum Value {
     String(String),
     Unit,
     List(Vec<Value>),
+    Map(std::collections::HashMap<String, Value>),
 }
 
 impl Value {
@@ -36,6 +37,13 @@ impl Value {
             Value::List(items) => {
                 let items: Vec<String> = items.iter().map(|v| v.to_string()).collect();
                 format!("[{}]", items.join(", "))
+            }
+            Value::Map(map) => {
+                let items: Vec<String> = map
+                    .iter()
+                    .map(|(k, v)| format!("{}: {}", k, v.to_string()))
+                    .collect();
+                format!("{{{}}}", items.join(", "))
             }
         }
     }
@@ -71,6 +79,7 @@ impl Value {
             Value::String(_) => "字符串",
             Value::Unit => "单元",
             Value::List(_) => "列表",
+            Value::Map(_) => "映射",
         }
     }
 }
@@ -91,6 +100,7 @@ impl PartialEq for Value {
             (Value::String(a), Value::String(b)) => a == b,
             (Value::Unit, Value::Unit) => true,
             (Value::List(a), Value::List(b)) => a == b,
+            (Value::Map(a), Value::Map(b)) => a == b,
             _ => false,
         }
     }

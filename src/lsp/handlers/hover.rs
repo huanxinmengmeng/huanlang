@@ -15,7 +15,7 @@
 use crate::lsp::{Position, Range};
 
 /// 悬停内容
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct HoverContents {
     /// 内容类型
     pub kind: HoverContentsKind,
@@ -24,7 +24,7 @@ pub struct HoverContents {
 }
 
 /// 悬停内容类型
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum HoverContentsKind {
     PlainText,
     Markdown,
@@ -37,7 +37,7 @@ impl Default for HoverContentsKind {
 }
 
 /// 悬停结果
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Hover {
     /// 悬停内容
     pub contents: HoverContents,
@@ -66,7 +66,7 @@ pub struct HoverHandler;
 
 impl HoverHandler {
     /// 处理悬停请求
-    pub fn handle(uri: &str, position: Position, word: &str) -> Option<Hover> {
+    pub fn handle(_uri: &str, _position: Position, word: &str) -> Option<Hover> {
         // 这里应该从符号表或AST中查找符号信息
         // 简化实现：根据词语返回示例信息
         

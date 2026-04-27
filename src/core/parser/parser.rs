@@ -155,6 +155,7 @@ impl Parser {
         self.current().map(|t| matches!(t.kind, TokenKind::Eof)).unwrap_or(true)
     }
 
+    #[allow(dead_code)]
     fn synchronize(&mut self) {
         self.advance();
         while !self.is_eof() {
@@ -270,6 +271,10 @@ impl Parser {
             self.parse_type_alias(public)
         } else if self.check(TokenKind::Global) {
             self.parse_global(public)
+        } else if self.check(TokenKind::Peripheral) {
+            self.parse_peripheral()
+        } else if self.check(TokenKind::Memory) || self.check(TokenKind::Layout) {
+            self.parse_memory_layout()
         } else if self.check(TokenKind::Let) || 
                   self.check(TokenKind::If) || 
                   self.check(TokenKind::While) || 
@@ -831,7 +836,7 @@ impl Parser {
         }
 
         // 检查是否是箭头 token，如果是，说明是新的 match arm 开始
-        if self.check(TokenKind::Arrow) {
+        if self.check(TokenKind::FatArrow) {
             // 是箭头，说明是新的 match arm 开始，返回错误让调用者处理
             return Err(ParseError::UnexpectedToken {
                 expected: "statement".to_string(),
@@ -848,7 +853,7 @@ impl Parser {
             let next = self.current();
             if next.is_some() {
                 match &next.unwrap().kind {
-                    TokenKind::Ident(_) | TokenKind::IntLit(_) | TokenKind::StringLit(_) | TokenKind::Default | TokenKind::Arrow => {
+                    TokenKind::Ident(_) | TokenKind::IntLit(_) | TokenKind::StringLit(_) | TokenKind::Default | TokenKind::FatArrow => {
                         // 是新的 match arm 开始，不消费分号
                     }
                     _ => {
@@ -1001,7 +1006,7 @@ impl Parser {
 
         while !self.check(TokenKind::RBrace) && !self.check(TokenKind::End) && !self.is_eof() {
             // 跳过任何分号、空白和箭头
-            while self.current().is_some() && (self.check(TokenKind::Semicolon) || self.current().unwrap().kind == TokenKind::Whitespace || self.check(TokenKind::Arrow)) {
+            while self.current().is_some() && (self.check(TokenKind::Semicolon) || self.current().unwrap().kind == TokenKind::Whitespace || self.check(TokenKind::FatArrow)) {
                 self.advance();
             }
             
@@ -1016,7 +1021,7 @@ impl Parser {
             
             if self.check(TokenKind::Default) {
                 self.advance();
-                self.expect(TokenKind::Arrow, "=>")?;
+                self.expect(TokenKind::FatArrow, "=>")?;
                 let mut stmts = Vec::new();
                 while !self.check(TokenKind::RBrace) && !self.check(TokenKind::End) && !self.is_eof() {
                     stmts.push(self.parse_stmt()?);
@@ -1049,7 +1054,7 @@ impl Parser {
             };
             
             // 消费箭头
-            if let Err(_) = self.expect(TokenKind::Arrow, "=>") {
+            if let Err(_) = self.expect(TokenKind::FatArrow, "=>") {
                 // 没有箭头，退出循环
                 break;
             };
@@ -1059,7 +1064,7 @@ impl Parser {
             // 解析 arm 体语句，直到遇到新的模式、结束标记或右大括号
             loop {
                 // 检查是否遇到结束标记
-                if self.check(TokenKind::RBrace) || self.check(TokenKind::End) || self.check(TokenKind::Default) || self.check(TokenKind::Match) || self.is_eof() {
+                if self.check(TokenKind::RBrace) || self.check(TokenKind::End) || self.check(TokenKind::Match) || self.is_eof() {
                     break;
                 }
                 
@@ -1071,7 +1076,7 @@ impl Parser {
                             // 是新的模式开始，退出循环
                             break;
                         }
-                        TokenKind::Arrow => {
+                        TokenKind::FatArrow => {
                             // 是箭头，说明是新的 match arm 开始，退出循环
                             break;
                         }
@@ -1095,7 +1100,7 @@ impl Parser {
                 let next = self.current();
                 if next.is_some() {
                     match &next.unwrap().kind {
-                        TokenKind::Ident(_) | TokenKind::IntLit(_) | TokenKind::StringLit(_) | TokenKind::Default | TokenKind::Arrow => {
+                        TokenKind::Ident(_) | TokenKind::IntLit(_) | TokenKind::StringLit(_) | TokenKind::Default | TokenKind::FatArrow => {
                             // 是新的模式开始或箭头，退出循环
                             break;
                         }
@@ -1241,6 +1246,7 @@ impl Parser {
         Ok(lhs)
     }
 
+    #[allow(dead_code)]
     fn get_binary_op(&self, kind: &TokenKind) -> Result<BinaryOp, ParseError> {
         match kind {
             TokenKind::Plus | TokenKind::Add => Ok(BinaryOp::Add),
@@ -1302,7 +1308,7 @@ impl Parser {
                     while !self.check(TokenKind::RParen) && !self.is_eof()
                         && !self.check(TokenKind::End) && !self.check(TokenKind::RBrace)
                         && !self.check(TokenKind::Semicolon) && !self.check(TokenKind::Comma)
-                        && !self.check(TokenKind::Arrow)
+                        && !self.check(TokenKind::FatArrow)
                     {
                         args.push(self.parse_expr()?);
 
@@ -1429,6 +1435,10 @@ impl Parser {
                     expr: Box::new(expr),
                     span: span.merge(self.current_span()),
                 })
+            }
+            TokenKind::Asm => {
+                self.advance();
+                self.parse_asm(span)
             }
             TokenKind::Eof => Err(ParseError::UnexpectedEof {
                 expected: "expression".to_string(),
@@ -1654,6 +1664,432 @@ impl Parser {
             value: Box::new(value),
             span,
         }))
+    }
+
+    fn parse_asm(&mut self, start_span: SourceSpan) -> Result<Expr, ParseError> {
+        // 期望看到 '!' 和 '('
+        if let Some(tok) = self.current() {
+            if tok.lexeme == "!" {
+                self.advance();
+            }
+        }
+        self.expect(TokenKind::LParen, "(")?;
+
+        let mut templates = Vec::new();
+        let mut outputs = Vec::new();
+        let mut inputs = Vec::new();
+        let mut clobbers = Vec::new();
+        let mut options = AsmOptions::default();
+
+        // 首先解析汇编模板字符串
+        while let Some(tok) = self.current() {
+            if let TokenKind::StringLit(s) = &tok.kind {
+                templates.push(s.clone());
+                self.advance();
+                // 尝试消费逗号
+                if self.eat(TokenKind::Comma).is_none() {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+
+        // 解析操作数、clobber、options
+        while !self.check(TokenKind::RParen) && !self.is_eof() {
+            // 检查是输出、输入还是clobber
+            if let Some(tok) = self.current() {
+                // 检查是否是'输出'或'input'关键词
+                let lexeme_lower = tok.lexeme.to_lowercase();
+                if lexeme_lower == "输出" || lexeme_lower == "output" {
+                    self.advance();
+                    outputs.push(self.parse_asm_operand()?);
+                } else if lexeme_lower == "输入" || lexeme_lower == "input" {
+                    self.advance();
+                    inputs.push(self.parse_asm_operand()?);
+                } else if lexeme_lower == "破坏" || lexeme_lower == "clobber" {
+                    self.advance();
+                    clobbers.extend(self.parse_asm_clobbers()?);
+                } else if lexeme_lower == "易失" || lexeme_lower == "volatile" {
+                    self.advance();
+                    options.volatile = true;
+                } else if lexeme_lower == "纯" || lexeme_lower == "pure" {
+                    self.advance();
+                    options.pure = true;
+                } else if lexeme_lower == "无内存" || lexeme_lower == "nomem" {
+                    self.advance();
+                    options.nomem = true;
+                } else if lexeme_lower == "保留标志" || lexeme_lower == "preserves_flags" {
+                    self.advance();
+                    options.preserves_flags = true;
+                } else if lexeme_lower == "不可达" || lexeme_lower == "noreturn" {
+                    self.advance();
+                    options.noreturn = true;
+                } else if lexeme_lower == "对齐栈" || lexeme_lower == "alignstack" {
+                    self.advance();
+                    options.alignstack = true;
+                } else if lexeme_lower == "英特尔语法" || lexeme_lower == "intel_syntax" {
+                    self.advance();
+                    options.intel_syntax = true;
+                } else {
+                    // 可能是第一个操作数没有关键词前缀，尝试解析为输入操作数
+                    inputs.push(self.parse_asm_operand()?);
+                }
+                // 消费逗号
+                self.eat(TokenKind::Comma);
+            } else {
+                break;
+            }
+        }
+
+        self.expect(TokenKind::RParen, ")")?;
+
+        let span = start_span.merge(self.current_span());
+
+        Ok(Expr::Asm(InlineAsm {
+            templates,
+            outputs,
+            inputs,
+            clobbers,
+            options,
+            span,
+        }))
+    }
+
+    fn parse_asm_operand(&mut self) -> Result<AsmOperand, ParseError> {
+        let mut name = None;
+        let mut constraint = String::new();
+
+        // 尝试解析约束，可能在括号中
+        if self.eat(TokenKind::LParen).is_some() {
+            if let Some(tok) = self.current() {
+                if let TokenKind::StringLit(s) = &tok.kind {
+                    constraint = s.clone();
+                } else {
+                    constraint = tok.lexeme.clone();
+                }
+                self.advance();
+            }
+            self.expect(TokenKind::RParen, ")")?;
+        } else {
+            // 没有显式约束，使用默认的约束字符
+            constraint = "r".to_string();
+        }
+
+        // 尝试解析变量名（如果是输出操作数）
+        if let Some(tok) = self.current() {
+            if let TokenKind::Ident(n) = &tok.kind {
+                name = Some(Ident::new(n.clone(), tok.span));
+                self.advance();
+                // 如果有 => 则后面是表达式
+                if self.eat(TokenKind::FatArrow).is_some() || self.eat(TokenKind::Assign).is_some() {
+                    let expr = self.parse_expr()?;
+                    return Ok(AsmOperand {
+                        name,
+                        constraint,
+                        expr,
+                    });
+                }
+            }
+        }
+
+        // 如果没有变量名，则解析表达式作为输入
+        let expr = self.parse_expr()?;
+        Ok(AsmOperand {
+            name,
+            constraint,
+            expr,
+        })
+    }
+
+    fn parse_asm_clobbers(&mut self) -> Result<Vec<String>, ParseError> {
+        let mut clobbers = Vec::new();
+        
+        self.expect(TokenKind::LParen, "(")?;
+        
+        while !self.check(TokenKind::RParen) && !self.is_eof() {
+            if let Some(tok) = self.current() {
+                if let TokenKind::StringLit(s) = &tok.kind {
+                    clobbers.push(s.clone());
+                } else {
+                    clobbers.push(tok.lexeme.clone());
+                }
+                self.advance();
+                self.eat(TokenKind::Comma);
+            } else {
+                break;
+            }
+        }
+        
+        self.expect(TokenKind::RParen, ")")?;
+        Ok(clobbers)
+    }
+
+    fn parse_peripheral(&mut self) -> Result<Item, ParseError> {
+        let start = self.current_span();
+        self.eat(TokenKind::Peripheral);
+        
+        let name_tok = self.expect_ident("peripheral name")?;
+        let name = Ident::new(name_tok.lexeme.clone(), name_tok.span);
+        
+        let base_addr = if self.eat(TokenKind::Assign).is_some() {
+            if let Some(tok) = self.current() {
+                if let TokenKind::IntLit(n) = tok.kind {
+                    self.advance();
+                    n as u64
+                } else {
+                    0
+                }
+            } else {
+                0
+            }
+        } else {
+            0
+        };
+        
+        let mut registers = Vec::new();
+        
+        self.expect(TokenKind::LBrace, "{")?;
+        
+        while !self.check(TokenKind::RBrace) && !self.is_eof() {
+            let reg_name_tok = self.expect_ident("register name")?;
+            let reg_name = Ident::new(reg_name_tok.lexeme.clone(), reg_name_tok.span);
+            
+            self.expect(TokenKind::Comma, ",")?;
+            
+            let offset = if let Some(tok) = self.current() {
+                if let TokenKind::IntLit(n) = tok.kind {
+                    self.advance();
+                    n as u64
+                } else {
+                    0
+                }
+            } else {
+                0
+            };
+            
+            self.expect(TokenKind::Comma, ",")?;
+            
+            let ty = self.parse_type()?;
+            
+            let access = if self.eat(TokenKind::Comma).is_some() {
+                if let Some(tok) = self.current() {
+                    let lexeme_lower = tok.lexeme.to_lowercase();
+                    if lexeme_lower == "只读" || lexeme_lower == "readonly" || lexeme_lower == "ro" {
+                        self.advance();
+                        RegisterAccess::ReadOnly
+                    } else if lexeme_lower == "只写" || lexeme_lower == "writeonly" || lexeme_lower == "wo" {
+                        self.advance();
+                        RegisterAccess::WriteOnly
+                    } else {
+                        self.advance();
+                        RegisterAccess::ReadWrite
+                    }
+                } else {
+                    RegisterAccess::ReadWrite
+                }
+            } else {
+                RegisterAccess::ReadWrite
+            };
+            
+            registers.push(PeripheralRegisterDef {
+                name: reg_name,
+                offset,
+                ty,
+                access,
+                span: start.merge(self.current_span()),
+            });
+            
+            self.eat(TokenKind::Comma);
+        }
+        
+        self.expect(TokenKind::RBrace, "}")?;
+        
+        let span = start.merge(self.current_span());
+        
+        Ok(Item::Peripheral(PeripheralDef {
+            name,
+            base_addr,
+            registers,
+            span,
+        }))
+    }
+
+    fn parse_memory_layout(&mut self) -> Result<Item, ParseError> {
+        let start = self.current_span();
+        
+        if self.check(TokenKind::Memory) {
+            self.eat(TokenKind::Memory);
+        } else {
+            self.eat(TokenKind::Layout);
+        }
+        
+        let name_tok = if let Some(tok) = self.current() {
+            if let TokenKind::Ident(_) = tok.kind {
+                Some(self.expect_ident("layout name")?)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        
+        let name = name_tok.map(|t| Ident::new(t.lexeme.clone(), t.span))
+            .unwrap_or_else(|| Ident::new("default".to_string(), start));
+        
+        let mut regions = Vec::new();
+        let mut segments = Vec::new();
+        
+        self.expect(TokenKind::LBrace, "{")?;
+        
+        while !self.check(TokenKind::RBrace) && !self.is_eof() {
+            if let Some(tok) = self.current() {
+                let lexeme_lower = tok.lexeme.to_lowercase();
+                if lexeme_lower == "闪存" || lexeme_lower == "flash" || 
+                   lexeme_lower == "内存" || lexeme_lower == "memory" {
+                    self.advance();
+                    regions.push(self.parse_memory_region()?);
+                } else if lexeme_lower == "段" || lexeme_lower == "segment" {
+                    self.advance();
+                    segments.push(self.parse_segment()?);
+                } else {
+                    self.advance();
+                }
+                self.eat(TokenKind::Comma);
+            } else {
+                break;
+            }
+        }
+        
+        self.expect(TokenKind::RBrace, "}")?;
+        
+        let span = start.merge(self.current_span());
+        
+        Ok(Item::MemoryLayout(MemoryLayout {
+            name,
+            regions,
+            segments,
+            span,
+        }))
+    }
+
+    fn parse_memory_region(&mut self) -> Result<MemoryRegionDef, ParseError> {
+        let start = self.current_span();
+        
+        let name = if let Some(tok) = self.current() {
+            if let TokenKind::Ident(_) = tok.kind {
+                let name = tok.lexeme.clone();
+                self.advance();
+                name
+            } else {
+                "memory".to_string()
+            }
+        } else {
+            "memory".to_string()
+        };
+        
+        let mut start_addr = 0u64;
+        let mut size = 0u64;
+        let mut attrs = Vec::new();
+        
+        while !self.check(TokenKind::Comma) && !self.check(TokenKind::RBrace) && !self.is_eof() {
+            if let Some(tok) = self.current() {
+                let lexeme_lower = tok.lexeme.to_lowercase();
+                if lexeme_lower == "起始" || lexeme_lower == "start" {
+                    self.advance();
+                    if let Some(tok) = self.current() {
+                        if let TokenKind::IntLit(n) = tok.kind {
+                            start_addr = n as u64;
+                            self.advance();
+                        }
+                    }
+                } else if lexeme_lower == "长度" || lexeme_lower == "size" || lexeme_lower == "length" {
+                    self.advance();
+                    if let Some(tok) = self.current() {
+                        if let TokenKind::IntLit(n) = tok.kind {
+                            size = n as u64;
+                            self.advance();
+                        }
+                    }
+                } else if lexeme_lower == "可读" || lexeme_lower == "readable" {
+                    self.advance();
+                    attrs.push(MemoryAttr::Readable);
+                } else if lexeme_lower == "可写" || lexeme_lower == "writable" {
+                    self.advance();
+                    attrs.push(MemoryAttr::Writable);
+                } else if lexeme_lower == "可执行" || lexeme_lower == "executable" {
+                    self.advance();
+                    attrs.push(MemoryAttr::Executable);
+                } else {
+                    self.advance();
+                }
+            } else {
+                break;
+            }
+        }
+        
+        let span = start.merge(self.current_span());
+        
+        Ok(MemoryRegionDef {
+            name,
+            start: start_addr,
+            size,
+            attributes: attrs,
+            span,
+        })
+    }
+
+    fn parse_segment(&mut self) -> Result<SegmentDef, ParseError> {
+        let start = self.current_span();
+        
+        let name = if let Some(tok) = self.current() {
+            if let TokenKind::Ident(_) = tok.kind {
+                let name = tok.lexeme.clone();
+                self.advance();
+                name
+            } else {
+                ".text".to_string()
+            }
+        } else {
+            ".text".to_string()
+        };
+        
+        let mut region = String::new();
+        let mut alignment = 4u64;
+        
+        while !self.check(TokenKind::Comma) && !self.check(TokenKind::RBrace) && !self.is_eof() {
+            if let Some(tok) = self.current() {
+                let lexeme_lower = tok.lexeme.to_lowercase();
+                if lexeme_lower == "放入" || lexeme_lower == "放入" || lexeme_lower == "in" {
+                    self.advance();
+                    if let Some(tok) = self.current() {
+                        region = tok.lexeme.clone();
+                        self.advance();
+                    }
+                } else if lexeme_lower == "对齐" || lexeme_lower == "align" {
+                    self.advance();
+                    if let Some(tok) = self.current() {
+                        if let TokenKind::IntLit(n) = tok.kind {
+                            alignment = n as u64;
+                            self.advance();
+                        }
+                    }
+                } else {
+                    self.advance();
+                }
+            } else {
+                break;
+            }
+        }
+        
+        let span = start.merge(self.current_span());
+        
+        Ok(SegmentDef {
+            name,
+            region,
+            alignment,
+            span,
+        })
     }
 }
 

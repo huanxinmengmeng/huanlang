@@ -52,7 +52,7 @@ pub mod main;
 
 pub use server::LspServer;
 pub use document::Document;
-pub use symbol_table::{SymbolTable, Symbol, SymbolKind, Location};
+pub use symbol_table::{SymbolTable, Symbol, SymbolKind};
 pub use diagnostics::Diagnostic;
 pub use error::LspError;
 pub use main::{start_server, LspMessage};

@@ -12,6 +12,10 @@
 
 pub mod llvm;
 pub mod ast_to_llvm;
+pub mod integration_tests;
 
 pub use llvm::LLVMBackend;
 pub use ast_to_llvm::{AstToLlvmCodeGen, validate_llvm_ir};
+
+#[cfg(test)]
+mod tests;

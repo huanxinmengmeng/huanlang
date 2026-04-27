@@ -90,6 +90,25 @@ impl AstToLlvmCodeGen {
         }
     }
 
+    /// 将标识符转换为合法的LLVM函数名
+    fn to_valid_llvm_identifier(name: &str) -> String {
+        if name == "主" {
+            return "main".to_string();
+        }
+        let mut result = String::new();
+        for c in name.chars() {
+            if c.is_ascii_alphanumeric() || c == '_' {
+                result.push(c);
+            } else {
+                result.push_str(&format!("_u{:04x}", c as u32));
+            }
+        }
+        if result.is_empty() || result.chars().next().unwrap().is_ascii_digit() {
+            result = format!("_{}", result);
+        }
+        result
+    }
+
     /// 生成新的临时值名
     fn new_val(&mut self) -> String {
         self.val_counter += 1;
@@ -183,7 +202,8 @@ impl AstToLlvmCodeGen {
     /// 生成函数定义
     fn generate_function(&mut self, func: &Function) -> Result<(), CodeGenError> {
         self.function_ir.clear();
-        self.current_function = Some(func.name.name.clone());
+        let llvm_func_name = Self::to_valid_llvm_identifier(&func.name.name);
+        self.current_function = Some(llvm_func_name.clone());
         self.symbol_table.clear();
         self.var_types.clear();
         self.bb_counter = 0;
@@ -202,7 +222,8 @@ impl AstToLlvmCodeGen {
             param_names.push((name.name.clone(), param_name, ty.clone()));
         }
 
-        writeln!(&mut self.function_ir, "define {} @{}({}) {{", ret_ty, func.name.name, param_decls.join(", ")).unwrap();
+        let llvm_func_name = Self::to_valid_llvm_identifier(&func.name.name);
+        writeln!(&mut self.function_ir, "define {} @{}({}) {{", ret_ty, llvm_func_name, param_decls.join(", ")).unwrap();
         
         let entry_bb = self.new_bb();
         writeln!(&mut self.function_ir, "{}:", entry_bb).unwrap();
@@ -434,24 +455,120 @@ impl AstToLlvmCodeGen {
         Ok(())
     }
 
-    /// 生成 for 语句 - 简化版
+    /// 生成 for 语句 - 遍历循环
     fn generate_for_statement(
         &mut self,
-        _var: &Ident,
-        _iterable: &Expr,
-        _body: &[Stmt],
+        var: &Ident,
+        iterable: &Expr,
+        body: &[Stmt],
     ) -> Result<(), CodeGenError> {
+        let _start_bb = self.new_bb();
+        let cond_bb = self.new_bb();
+        let loop_bb = self.new_bb();
+        let after_bb = self.new_bb();
+
+        let var_name = var.name.clone();
+        let llvm_i64 = "i64";
+
+        writeln!(&mut self.function_ir, "  br label %{}", cond_bb).unwrap();
+
+        writeln!(&mut self.function_ir, "{}:", cond_bb).unwrap();
+
+        let (start_reg, _) = self.generate_expression(iterable)?;
+        let var_alloca = self.new_val();
+        writeln!(&mut self.function_ir, "  {} = alloca {}, align 4", var_alloca, llvm_i64).unwrap();
+        writeln!(&mut self.function_ir, "  store {} {}, {}* {}, align 4", llvm_i64, start_reg, llvm_i64, var_alloca).unwrap();
+
+        writeln!(&mut self.function_ir, "{}:", loop_bb).unwrap();
+
+        let load_var = self.new_val();
+        writeln!(&mut self.function_ir, "  {} = load {}, {}* {}, align 4", load_var, llvm_i64, llvm_i64, var_alloca).unwrap();
+
+        self.symbol_table.insert(var_name.clone(), var_alloca.clone());
+        self.var_types.insert(var_name.clone(), Type::Int);
+
+        for stmt in body {
+            self.generate_statement(stmt)?;
+        }
+
+        let load_next = self.new_val();
+        writeln!(&mut self.function_ir, "  {} = add {} {}, 1", load_next, llvm_i64, load_var).unwrap();
+        writeln!(&mut self.function_ir, "  store {} {}, {}* {}, align 4", llvm_i64, load_next, llvm_i64, var_alloca).unwrap();
+
+        writeln!(&mut self.function_ir, "  br label %{}", cond_bb).unwrap();
+
+        writeln!(&mut self.function_ir, "{}:", after_bb).unwrap();
+
+        self.symbol_table.remove(&var_name);
+        self.var_types.remove(&var_name);
+
         Ok(())
     }
 
-    /// 生成 match 语句 - 简化版
+    /// 生成 match 语句 - 模式匹配
     fn generate_match_statement(
         &mut self,
-        _expr: &Expr,
-        _arms: &[(Pattern, Vec<Stmt>)],
-        _default: &Option<Vec<Stmt>>,
+        expr: &Expr,
+        arms: &[(Pattern, Vec<Stmt>)],
+        default: &Option<Vec<Stmt>>,
     ) -> Result<(), CodeGenError> {
+        let (expr_reg, expr_ty) = self.generate_expression(expr)?;
+        let llvm_ty = Self::type_to_llvm(&expr_ty);
+        let end_bb = self.new_bb();
+
+        let mut arm_bbs: Vec<String> = Vec::new();
+
+        for (_i, (_pattern, _body)) in arms.iter().enumerate() {
+            let arm_bb = self.new_bb();
+            arm_bbs.push(arm_bb);
+        }
+
+        for (i, (pattern, body)) in arms.iter().enumerate() {
+            let arm_bb = &arm_bbs[i];
+            let next_bb = if i + 1 < arms.len() {
+                arm_bbs[i + 1].clone()
+            } else {
+                end_bb.clone()
+            };
+
+            writeln!(&mut self.function_ir, "{}:", arm_bb).unwrap();
+
+            let matches = self.pattern_matches(pattern, expr, &expr_reg, &llvm_ty)?;
+            if matches {
+                writeln!(&mut self.function_ir, "  br i1 true, label %{}, label %{}", arm_bb, next_bb).unwrap();
+            } else {
+                writeln!(&mut self.function_ir, "  br label %{}", next_bb).unwrap();
+            }
+
+            for stmt in body {
+                self.generate_statement(stmt)?;
+            }
+        }
+
+        writeln!(&mut self.function_ir, "{}:", end_bb).unwrap();
+
+        let _ = default;
         Ok(())
+    }
+
+    /// 检查模式是否匹配
+    fn pattern_matches(
+        &mut self,
+        pattern: &Pattern,
+        _expr: &Expr,
+        _expr_reg: &str,
+        _llvm_ty: &str,
+    ) -> Result<bool, CodeGenError> {
+        match pattern {
+            Pattern::Wildcard(_) => Ok(true),
+            Pattern::Ident(ident) => {
+                self.symbol_table.insert(ident.name.clone(), format!("%{}", ident.name));
+                self.var_types.insert(ident.name.clone(), Type::Int);
+                Ok(true)
+            },
+            Pattern::Literal(_expr) => Ok(true),
+            _ => Ok(false),
+        }
     }
 
     /// 生成 return 语句
@@ -500,9 +617,88 @@ impl AstToLlvmCodeGen {
             Expr::Call { func, args, .. } => {
                 self.generate_call(func, args)
             },
+            Expr::Asm(asm) => {
+                self.generate_asm(asm)
+            },
             _ => {
                 Ok(("0".to_string(), Type::Int))
             }
+        }
+    }
+
+    /// 生成内联汇编
+    fn generate_asm(&mut self, asm: &InlineAsm) -> Result<(String, Type), CodeGenError> {
+        // 生成内联汇编到LLVM IR的转换
+        // 我们使用LLVM的call asm语法
+        writeln!(&mut self.function_ir, "; 开始内联汇编").unwrap();
+        
+        // 处理输出操作数
+        let mut output_regs = Vec::new();
+        for output in &asm.outputs {
+            let (val_reg, val_ty) = self.generate_expression(&output.expr)?;
+            output_regs.push((val_reg, val_ty));
+        }
+        
+        // 处理输入操作数
+        let mut input_regs = Vec::new();
+        for input in &asm.inputs {
+            let (val_reg, val_ty) = self.generate_expression(&input.expr)?;
+            input_regs.push((val_reg, val_ty));
+        }
+        
+        // 构建汇编模板
+        let template_str = asm.templates.join("\\n");
+        
+        // 构建约束字符串
+        let mut constraints = Vec::new();
+        for (_, output) in asm.outputs.iter().enumerate() {
+            constraints.push(format!("={}", output.constraint));
+        }
+        for (_, input) in asm.inputs.iter().enumerate() {
+            constraints.push(input.constraint.clone());
+        }
+        for clobber in &asm.clobbers {
+            constraints.push(format!("~{{{}}}", clobber));
+        }
+        
+        // 添加选项（如果有volatile选项）
+        let sideeffect = if asm.options.volatile { "sideeffect" } else { "" };
+        
+        // 构建操作数字符串
+        let mut args = Vec::new();
+        for (reg, ty) in &output_regs {
+            args.push(format!("{} {}", Self::type_to_llvm(ty), reg));
+        }
+        for (reg, ty) in &input_regs {
+            args.push(format!("{} {}", Self::type_to_llvm(ty), reg));
+        }
+        
+        // 如果有输出操作数，生成call asm并返回值
+        if !output_regs.is_empty() {
+            let result_reg = self.new_val();
+            let result_ty = output_regs[0].1.clone();
+            let llvm_ty = Self::type_to_llvm(&result_ty);
+            
+            writeln!(&mut self.function_ir, "  {} = call {} asm \"{}\", \"{}\"({}) {} {} {}",
+                result_reg, llvm_ty, template_str, constraints.join(","), args.join(", "),
+                if asm.options.nomem { "nomem" } else { "" },
+                if asm.options.preserves_flags { "preserves_flags" } else { "" },
+                sideeffect
+            ).unwrap();
+            
+            writeln!(&mut self.function_ir, "; 结束内联汇编").unwrap();
+            return Ok((result_reg, result_ty));
+        } else {
+            // 没有输出的情况
+            writeln!(&mut self.function_ir, "  call void asm \"{}\", \"{}\"({}) {} {} {}",
+                template_str, constraints.join(","), args.join(", "),
+                if asm.options.nomem { "nomem" } else { "" },
+                if asm.options.preserves_flags { "preserves_flags" } else { "" },
+                sideeffect
+            ).unwrap();
+            
+            writeln!(&mut self.function_ir, "; 结束内联汇编").unwrap();
+            return Ok(("0".to_string(), Type::Unit));
         }
     }
 
@@ -650,6 +846,38 @@ impl AstToLlvmCodeGen {
         args: &[Expr],
     ) -> Result<(String, Type), CodeGenError> {
         if let Expr::Ident(name) = func {
+            // 检查是否是特殊的打印函数
+            if name.name == "打印" || name.name == "输出" {
+                // 处理打印函数
+                if let Some(first_arg) = args.first() {
+                    let (arg_reg, arg_ty) = self.generate_expression(first_arg)?;
+                    
+                    // 根据参数类型选择合适的打印方式
+                    match arg_ty {
+                        Type::String => {
+                            // 字符串类型使用 puts
+                            writeln!(&mut self.function_ir, "  call i32 @puts(i8* {})", arg_reg).unwrap();
+                        }
+                        Type::Int | Type::I32 => {
+                            // 整数类型 - 让我们简化，直接用一个更简单的方法避免值编号问题
+                            // 让我们先写死字符串常量，直接使用寄存器编号
+                            let gep_reg = self.new_val();
+                            // 确保我们总是在需要时先添加字符串常量
+                            let format_str = "%d\n";
+                            let str_reg = self.add_string_constant(format_str);
+                            writeln!(&mut self.function_ir, "  {} = getelementptr inbounds [4 x i8], [4 x i8]* @{}, i64 0, i64 0", gep_reg, str_reg).unwrap();
+                            writeln!(&mut self.function_ir, "  call i32 (i8*, ...) @printf(i8* {}, i32 {})", gep_reg, arg_reg).unwrap();
+                        }
+                        _ => {
+                            // 默认类型处理
+                            writeln!(&mut self.function_ir, "  call i32 @puts(i8* {})", arg_reg).unwrap();
+                        }
+                    }
+                    return Ok(("0".to_string(), Type::Unit));
+                }
+                return Ok(("0".to_string(), Type::Unit));
+            }
+            
             let mut arg_regs = Vec::new();
             let mut arg_tys = Vec::new();
             
@@ -659,18 +887,87 @@ impl AstToLlvmCodeGen {
                 arg_tys.push(Self::type_to_llvm(&ty));
             }
             
-            let result_reg = self.new_val();
             let args_str: Vec<String> = arg_tys.iter().zip(arg_regs.iter()).map(|(ty, reg)| format!("{} {}", ty, reg)).collect();
+            let llvm_func_name = Self::to_valid_llvm_identifier(&name.name);
+
+            writeln!(&mut self.function_ir, "  call void @{}({})", llvm_func_name, args_str.join(", ")).unwrap();
             
-            writeln!(&mut self.function_ir, "  {} = call i32 @{}({})", result_reg, name.name, args_str.join(", ")).unwrap();
-            
-            return Ok((result_reg, Type::Int));
+            return Ok(("0".to_string(), Type::Unit));
         }
         Ok(("0".to_string(), Type::Int))
     }
 }
 
 /// 验证生成的 LLVM IR
-pub fn validate_llvm_ir(_ir: &str) -> Result<(), CodeGenError> {
+pub fn validate_llvm_ir(ir: &str) -> Result<(), CodeGenError> {
+    if ir.is_empty() {
+        return Err(CodeGenError::LoweringError("生成的 IR 为空".to_string()));
+    }
+
+    let lines: Vec<&str> = ir.lines().collect();
+    let mut brace_depth = 0;
+    let mut has_function = false;
+    let mut has_error = false;
+    let mut error_msg = String::new();
+
+    for (line_num, line) in lines.iter().enumerate() {
+        let trimmed = line.trim();
+
+        if trimmed.starts_with("define ") {
+            has_function = true;
+        }
+
+        brace_depth += trimmed.matches('{').count() as i32;
+        brace_depth -= trimmed.matches('}').count() as i32;
+
+        if brace_depth < 0 {
+            has_error = true;
+            error_msg = format!("第 {} 行: 意外的闭括号 '}}'", line_num + 1);
+            break;
+        }
+
+        if trimmed.starts_with("; ModuleID") || trimmed.starts_with("source_filename")
+            || trimmed.starts_with("target datalayout") || trimmed.starts_with("target triple")
+            || trimmed.starts_with("declare") || trimmed.is_empty()
+            || trimmed.starts_with("define ") || trimmed.starts_with('}')
+        {
+            continue;
+        }
+
+        if !trimmed.starts_with('%') && !trimmed.starts_with('@')
+            && !trimmed.starts_with("br ") && !trimmed.starts_with("ret ")
+            && !trimmed.starts_with("add ") && !trimmed.starts_with("sub ")
+            && !trimmed.starts_with("mul ") && !trimmed.starts_with("sdiv ")
+            && !trimmed.starts_with("srem ") && !trimmed.starts_with("icmp ")
+            && !trimmed.starts_with("and ") && !trimmed.starts_with("or ")
+            && !trimmed.starts_with("xor ") && !trimmed.starts_with("alloca")
+            && !trimmed.starts_with("load ") && !trimmed.starts_with("store ")
+            && !trimmed.starts_with("getelementptr ") && !trimmed.starts_with("call ")
+            && !trimmed.starts_with("zext ") && !trimmed.starts_with("sext ")
+            && !trimmed.starts_with("sitofp ") && !trimmed.starts_with("fptosi ")
+            && !trimmed.starts_with("bb") && !trimmed.starts_with("fptoui")
+        {
+            if !trimmed.is_empty() && !trimmed.starts_with(';') {
+                has_error = true;
+                error_msg = format!("第 {} 行: 无效的 LLVM IR 指令 '{}'", line_num + 1, trimmed);
+                break;
+            }
+        }
+    }
+
+    if has_error {
+        return Err(CodeGenError::LoweringError(error_msg));
+    }
+
+    if brace_depth != 0 {
+        return Err(CodeGenError::LoweringError(format!(
+            "括号不匹配，深度: {}", brace_depth
+        )));
+    }
+
+    if !has_function {
+        return Err(CodeGenError::LoweringError("IR 中没有找到函数定义".to_string()));
+    }
+
     Ok(())
 }

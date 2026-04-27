@@ -19,7 +19,7 @@ pub struct DefinitionHandler;
 
 impl DefinitionHandler {
     /// 处理定义请求
-    pub fn handle(uri: &str, position: Position, word: &str) -> Vec<Location> {
+    pub fn handle(_uri: &str, _position: Position, _word: &str) -> Vec<Location> {
         // 这里应该从符号表查找定义位置
         // 简化实现：返回空列表
         Vec::new()
@@ -31,7 +31,7 @@ pub struct ReferencesHandler;
 
 impl ReferencesHandler {
     /// 处理引用请求
-    pub fn handle(uri: &str, position: Position, word: &str) -> Vec<Location> {
+    pub fn handle(_uri: &str, _position: Position, _word: &str) -> Vec<Location> {
         // 这里应该从工作区索引查找所有引用
         // 简化实现：返回空列表
         Vec::new()
@@ -43,7 +43,7 @@ pub struct DocumentHighlightHandler;
 
 impl DocumentHighlightHandler {
     /// 处理文档高亮请求
-    pub fn handle(uri: &str, position: Position, word: &str) -> Vec<DocumentHighlight> {
+    pub fn handle(_uri: &str, _position: Position, _word: &str) -> Vec<DocumentHighlight> {
         // 这里应该查找文档中所有匹配的词语
         // 简化实现：返回空列表
         Vec::new()

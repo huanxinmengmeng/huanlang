@@ -20,10 +20,10 @@ pub struct ReferencesHandler;
 impl ReferencesHandler {
     /// 处理引用请求
     pub fn handle(
-        uri: &str,
-        position: Position,
-        word: &str,
-        include_declaration: bool,
+        _uri: &str,
+        _position: Position,
+        _word: &str,
+        _include_declaration: bool,
     ) -> Vec<Location> {
         // 这里应该从工作区索引查找所有引用
         // 简化实现：返回空列表

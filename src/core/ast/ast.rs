@@ -506,6 +506,8 @@ pub enum Item {
     Extern(ExternBlock),
     TypeAlias(TypeAlias),
     Global(Global),
+    Peripheral(PeripheralDef),
+    MemoryLayout(MemoryLayout),
 }
 
 impl Item {
@@ -520,8 +522,66 @@ impl Item {
             Item::Extern(e) => e.span,
             Item::TypeAlias(t) => t.span,
             Item::Global(g) => g.span,
+            Item::Peripheral(p) => p.span,
+            Item::MemoryLayout(m) => m.span,
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PeripheralDef {
+    pub name: Ident,
+    pub base_addr: u64,
+    pub registers: Vec<PeripheralRegisterDef>,
+    pub span: SourceSpan,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PeripheralRegisterDef {
+    pub name: Ident,
+    pub offset: u64,
+    pub ty: Type,
+    pub access: RegisterAccess,
+    pub span: SourceSpan,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum RegisterAccess {
+    ReadOnly,
+    WriteOnly,
+    ReadWrite,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MemoryLayout {
+    pub name: Ident,
+    pub regions: Vec<MemoryRegionDef>,
+    pub segments: Vec<SegmentDef>,
+    pub span: SourceSpan,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MemoryRegionDef {
+    pub name: String,
+    pub start: u64,
+    pub size: u64,
+    pub attributes: Vec<MemoryAttr>,
+    pub span: SourceSpan,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum MemoryAttr {
+    Readable,
+    Writable,
+    Executable,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SegmentDef {
+    pub name: String,
+    pub region: String,
+    pub alignment: u64,
+    pub span: SourceSpan,
 }
 
 #[derive(Debug, Clone, PartialEq)]

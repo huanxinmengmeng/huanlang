@@ -69,13 +69,13 @@ impl Interpreter {
         if let Some(main_func) = self.env.get_function("主").cloned() {
             println!("DEBUG: 找到中文主函数");
             let args: Vec<Value> = vec![];
-            return self.execute_function_body(&main_func.body, args);
+            return self.execute_function_body(&main_func.body, main_func.params, args);
         }
 
         if let Some(main_func) = self.env.get_function("main").cloned() {
             println!("DEBUG: 找到英文主函数");
             let args: Vec<Value> = vec![];
-            return self.execute_function_body(&main_func.body, args);
+            return self.execute_function_body(&main_func.body, main_func.params, args);
         }
 
         println!("DEBUG: 未找到主函数");
@@ -120,11 +120,32 @@ impl Interpreter {
         // 内置函数不需要添加到环境中，直接在 eval_builtin_function 中处理
     }
 
-    fn execute_function_body(&mut self, body: &Vec<Stmt>, _args: Vec<Value>) -> Result<Value, String> {
+    fn execute_function_body(&mut self, body: &Vec<Stmt>, params: Vec<String>, args: Vec<Value>) -> Result<Value, String> {
+        // 保存当前环境状态
+        let saved_state = self.env.save_state();
+
+        // 将参数绑定到环境中
+        if params.len() == args.len() {
+            for (param_name, arg_value) in params.iter().zip(args.iter()) {
+                self.env.set_var(param_name.clone(), arg_value.clone());
+            }
+        } else {
+            return Err(format!("函数参数数量不匹配: 期望 {}, 实际 {}", params.len(), args.len()));
+        }
+
+        // 执行函数体
         let mut result = Value::Unit;
         for stmt in body {
-            result = self.execute_stmt(stmt)?;
+            let stmt_result = self.execute_stmt(stmt)?;
+            if !matches!(stmt_result, Value::Unit) {
+                result = stmt_result;
+                break;
+            }
         }
+
+        // 恢复环境状态
+        self.env.load_state(saved_state);
+
         Ok(result)
     }
 
@@ -267,6 +288,7 @@ impl Interpreter {
                 }
             }
             Expr::List(items, _) => self.eval_list(items),
+            Expr::Map(items, _) => self.eval_map(items),
             Expr::Index { target, index, .. } => self.eval_index(target, index),
             Expr::Field { target, field, .. } => self.eval_field_access(target, field),
             Expr::TypeAssertion { expr, .. } => self.evaluate_expr(expr),
@@ -298,6 +320,11 @@ impl Interpreter {
                         else { Ok(Value::Int(l / r)) }
                     }
                     BinaryOp::Mod => Ok(Value::Int(l % r)),
+                    BinaryOp::Shl => Ok(Value::Int(l << r)),
+                    BinaryOp::Shr => Ok(Value::Int(l >> r)),
+                    BinaryOp::BitAnd => Ok(Value::Int(l & r)),
+                    BinaryOp::BitOr => Ok(Value::Int(l | r)),
+                    BinaryOp::BitXor => Ok(Value::Int(l ^ r)),
                     BinaryOp::Eq => Ok(Value::Bool(l == r)),
                     BinaryOp::Ne => Ok(Value::Bool(l != r)),
                     BinaryOp::Lt => Ok(Value::Bool(l < r)),
@@ -349,6 +376,7 @@ impl Interpreter {
             (UnaryOp::Neg, Value::Int(n)) => Ok(Value::Int(-*n)),
             (UnaryOp::Neg, Value::Float(f)) => Ok(Value::Float(-*f)),
             (UnaryOp::Not, Value::Bool(b)) => Ok(Value::Bool(!*b)),
+            (UnaryOp::BitNot, Value::Int(n)) => Ok(Value::Int(!*n)),
             _ => Err("无效的一元运算符".to_string()),
         }
     }
@@ -375,7 +403,7 @@ impl Interpreter {
         println!("DEBUG: 检查用户定义函数");
         if let Some(func_def) = self.env.get_function(&func_name).cloned() {
             println!("DEBUG: 调用用户定义函数成功");
-            return self.execute_function_body(&func_def.body, evaluated_args);
+            return self.execute_function_body(&func_def.body, func_def.params, evaluated_args);
         }
         
         println!("DEBUG: 未找到函数: {}", func_name);
@@ -386,33 +414,24 @@ impl Interpreter {
         match func_name {
             "显示" | "打印" | "print" | "显示行" | "xianshi" | "dayin" | "xianshihang" => {
                 use std::io::{self, Write};
-                
-                println!("DEBUG: 调用内置函数: {}", func_name);
-                println!("DEBUG: 参数数量: {}", args.len());
-                for (i, arg) in args.iter().enumerate() {
-                    println!("DEBUG: 参数 {}: {:?}", i, arg);
-                }
-                
+
                 if args.is_empty() {
                     println!();
                     io::stdout().flush().unwrap();
                     return Some(Ok(Value::Unit));
                 }
-                
+
                 if args.len() == 1 {
-                    // 单个参数，直接输出
                     println!("{}", args[0].to_string());
                     io::stdout().flush().unwrap();
                     return Some(Ok(Value::Unit));
                 }
-                
-                // 多个参数，第一个参数作为格式化字符串
+
                 if let Value::String(format_str) = &args[0] {
                     let mut result = format_str.clone();
                     for (i, arg) in args.iter().skip(1).enumerate() {
                         let placeholder = format!("{{{}}}", i);
                         result = result.replace(&placeholder, &arg.to_string());
-                        // 同时替换 {} 占位符
                         if let Some(pos) = result.find("{}") {
                             result.replace_range(pos..pos+2, &arg.to_string());
                         }
@@ -420,7 +439,6 @@ impl Interpreter {
                     println!("{}", result);
                     io::stdout().flush().unwrap();
                 } else {
-                    // 第一个参数不是字符串，直接输出所有参数
                     for arg in args {
                         print!("{}", arg.to_string());
                     }
@@ -432,6 +450,103 @@ impl Interpreter {
             "退出" | "exit" | "tuichu" => {
                 let code = args.first().and_then(|v| v.as_int()).unwrap_or(0);
                 std::process::exit(code as i32);
+            }
+            "长度" | "len" | "changdu" => {
+                if let Some(arg) = args.first() {
+                    match arg {
+                        Value::String(s) => Some(Ok(Value::Int(s.len() as i64))),
+                        Value::List(l) => Some(Ok(Value::Int(l.len() as i64))),
+                        Value::Map(m) => Some(Ok(Value::Int(m.len() as i64))),
+                        _ => Some(Err("参数不支持获取长度".to_string())),
+                    }
+                } else {
+                    Some(Err("参数不足".to_string()))
+                }
+            }
+            "绝对值" | "abs" | "jueduizhi" => {
+                if let Some(arg) = args.first() {
+                    match arg {
+                        Value::Int(n) => Some(Ok(Value::Int(n.abs()))),
+                        Value::Float(f) => Some(Ok(Value::Float(f.abs()))),
+                        _ => Some(Err("参数不支持绝对值".to_string())),
+                    }
+                } else {
+                    Some(Err("参数不足".to_string()))
+                }
+            }
+            "最大值" | "max" | "zuida" => {
+                if args.len() == 2 {
+                    match (&args[0], &args[1]) {
+                        (Value::Int(a), Value::Int(b)) => Some(Ok(Value::Int((*a).max(*b)))),
+                        (Value::Float(a), Value::Float(b)) => Some(Ok(Value::Float((*a).max(*b)))),
+                        _ => Some(Err("参数类型不匹配".to_string())),
+                    }
+                } else {
+                    Some(Err("需要两个参数".to_string()))
+                }
+            }
+            "最小值" | "min" | "zuixiao" => {
+                if args.len() == 2 {
+                    match (&args[0], &args[1]) {
+                        (Value::Int(a), Value::Int(b)) => Some(Ok(Value::Int((*a).min(*b)))),
+                        (Value::Float(a), Value::Float(b)) => Some(Ok(Value::Float((*a).min(*b)))),
+                        _ => Some(Err("参数类型不匹配".to_string())),
+                    }
+                } else {
+                    Some(Err("需要两个参数".to_string()))
+                }
+            }
+            "平方根" | "sqrt" | "pingfanggen" => {
+                if let Some(arg) = args.first() {
+                    match arg {
+                        Value::Int(n) => Some(Ok(Value::Float((*n as f64).sqrt()))),
+                        Value::Float(f) => Some(Ok(Value::Float(f.sqrt()))),
+                        _ => Some(Err("参数不支持平方根".to_string())),
+                    }
+                } else {
+                    Some(Err("参数不足".to_string()))
+                }
+            }
+            "幂" | "pow" | "mi" => {
+                if args.len() == 2 {
+                    match (&args[0], &args[1]) {
+                        (Value::Int(base), Value::Int(exp)) => Some(Ok(Value::Int(base.pow(*exp as u32)))),
+                        (Value::Float(base), Value::Float(exp)) => Some(Ok(Value::Float(base.powf(*exp)))),
+                        _ => Some(Err("参数类型不匹配".to_string())),
+                    }
+                } else {
+                    Some(Err("需要两个参数".to_string()))
+                }
+            }
+            "取整" | "round" | "quzheng" => {
+                if let Some(arg) = args.first() {
+                    match arg {
+                        Value::Float(f) => Some(Ok(Value::Float(f.round()))),
+                        _ => Some(Err("参数不支持取整".to_string())),
+                    }
+                } else {
+                    Some(Err("参数不足".to_string()))
+                }
+            }
+            "向下取整" | "floor" | "xiangxiaquzheng" => {
+                if let Some(arg) = args.first() {
+                    match arg {
+                        Value::Float(f) => Some(Ok(Value::Float(f.floor()))),
+                        _ => Some(Err("参数不支持向下取整".to_string())),
+                    }
+                } else {
+                    Some(Err("参数不足".to_string()))
+                }
+            }
+            "向上取整" | "ceil" | "xiangshangquzheng" => {
+                if let Some(arg) = args.first() {
+                    match arg {
+                        Value::Float(f) => Some(Ok(Value::Float(f.ceil()))),
+                        _ => Some(Err("参数不支持向上取整".to_string())),
+                    }
+                } else {
+                    Some(Err("参数不足".to_string()))
+                }
             }
             _ => None,
         }
@@ -465,17 +580,51 @@ impl Interpreter {
         Ok(Value::List(evaluated?))
     }
 
+    fn eval_map(&mut self, items: &[(Expr, Expr)]) -> Result<Value, String> {
+        let mut map = std::collections::HashMap::new();
+        for (key_expr, value_expr) in items {
+            let key = self.evaluate_expr(key_expr)?;
+            let key_str = match key {
+                Value::String(s) => s,
+                Value::Int(n) => n.to_string(),
+                Value::Char(c) => c.to_string(),
+                Value::Bool(b) => b.to_string(),
+                _ => return Err("映射的键必须是字符串或可转换为字符串的类型".to_string()),
+            };
+            let value = self.evaluate_expr(value_expr)?;
+            map.insert(key_str, value);
+        }
+        Ok(Value::Map(map))
+    }
+
     fn eval_index(&mut self, target: &Expr, index: &Expr) -> Result<Value, String> {
-        let list = self.evaluate_expr(target)?;
+        let target_val = self.evaluate_expr(target)?;
         let idx = self.evaluate_expr(index)?;
-        if let (Value::List(items), Some(i)) = (list, idx.as_int()) {
-            if let Some(item) = items.get(i as usize) {
-                Ok(item.clone())
-            } else {
-                Err("索引越界".to_string())
+        
+        match (&target_val, &idx) {
+            (Value::List(items), Value::Int(i)) => {
+                if let Some(item) = items.get(*i as usize) {
+                    Ok(item.clone())
+                } else {
+                    Err("索引越界".to_string())
+                }
             }
-        } else {
-            Err("无效的索引操作".to_string())
+            (Value::Map(map), Value::String(s)) => {
+                if let Some(value) = map.get(s) {
+                    Ok(value.clone())
+                } else {
+                    Err(format!("映射中未找到键: {}", s))
+                }
+            }
+            (Value::Map(map), Value::Int(i)) => {
+                let key = i.to_string();
+                if let Some(value) = map.get(&key) {
+                    Ok(value.clone())
+                } else {
+                    Err(format!("映射中未找到键: {}", key))
+                }
+            }
+            _ => Err("无效的索引操作".to_string()),
         }
     }
 
@@ -487,6 +636,26 @@ impl Interpreter {
                     "长度" | "length" => Ok(Value::Int(items.len() as i64)),
                     "迭代" | "iter" => Ok(Value::List(items)),
                     _ => Err(format!("列表没有字段: {}", field.name)),
+                }
+            }
+            Value::Map(map) => {
+                match field.name.as_str() {
+                    "长度" | "length" => Ok(Value::Int(map.len() as i64)),
+                    "键列表" | "keys" => {
+                        let keys: Vec<Value> = map.keys().map(|k| Value::String(k.clone())).collect();
+                        Ok(Value::List(keys))
+                    }
+                    "值列表" | "values" => {
+                        let values: Vec<Value> = map.values().cloned().collect();
+                        Ok(Value::List(values))
+                    }
+                    _ => Err(format!("映射没有字段: {}", field.name)),
+                }
+            }
+            Value::String(s) => {
+                match field.name.as_str() {
+                    "长度" | "length" => Ok(Value::Int(s.len() as i64)),
+                    _ => Err(format!("字符串没有字段: {}", field.name)),
                 }
             }
             _ => Err(format!("类型 {} 没有字段访问", value.type_name())),

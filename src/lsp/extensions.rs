@@ -89,7 +89,7 @@ pub struct HuanGenerateCodeHandler;
 
 impl HuanGenerateCodeHandler {
     /// 处理代码生成请求
-    pub fn handle(params: HuanGenerateCodeParams) -> HuanGenerateCodeResult {
+    pub fn handle(_params: HuanGenerateCodeParams) -> HuanGenerateCodeResult {
         // 这里应该调用 AI 后端服务
         // 简化实现：返回示例代码
         
@@ -153,7 +153,7 @@ pub struct HuanExplainCodeHandler;
 
 impl HuanExplainCodeHandler {
     /// 处理代码解释请求
-    pub fn handle(params: HuanExplainCodeParams) -> HuanExplainCodeResult {
+    pub fn handle(_params: HuanExplainCodeParams) -> HuanExplainCodeResult {
         // 这里应该分析代码并生成解释
         // 简化实现：返回基本解释
         
@@ -198,7 +198,7 @@ pub struct HuanConvertToAefHandler;
 
 impl HuanConvertToAefHandler {
     /// 处理 AEF 转换请求
-    pub fn handle(params: HuanConvertToAefParams) -> HuanConvertToAefResult {
+    pub fn handle(_params: HuanConvertToAefParams) -> HuanConvertToAefResult {
         // 这里应该将幻语代码转换为 AEF 格式
         // 简化实现：返回占位符
         
@@ -229,7 +229,7 @@ pub struct HuanChangeKeywordStyleHandler;
 
 impl HuanChangeKeywordStyleHandler {
     /// 处理关键词风格转换请求
-    pub fn handle(params: HuanChangeKeywordStyleParams) -> HuanChangeKeywordStyleResult {
+    pub fn handle(_params: HuanChangeKeywordStyleParams) -> HuanChangeKeywordStyleResult {
         // 这里应该转换文档中的关键词风格
         // 简化实现：返回占位符
         

@@ -20,9 +20,10 @@
 use crate::package::error::{PackageError, PackageResult};
 use std::path::Path;
 use std::fs;
-use ring::{signature, digest, rand};
+use ring::{signature, digest};
 use ring::signature::KeyPair;
 use serde::{Deserialize, Serialize};
+use base64::{engine::general_purpose, Engine as _};
 
 /// 签名类型
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -198,11 +199,11 @@ impl SecurityManager {
     /// 验证ED25519签名
     fn verify_ed25519_signature(&self, data: &[u8], signature: &PackageSignature) -> PackageResult<bool> {
         // 解码公钥
-        let public_key_bytes = base64::decode(&signature.public_key)
+        let public_key_bytes = general_purpose::STANDARD.decode(&signature.public_key)
             .map_err(|e| PackageError::package_error(&format!("公钥解码失败: {:?}", e), None))?;
         
         // 解码签名
-        let signature_bytes = base64::decode(&signature.signature)
+        let signature_bytes = general_purpose::STANDARD.decode(&signature.signature)
             .map_err(|e| PackageError::package_error(&format!("签名解码失败: {:?}", e), None))?;
         
         // 创建公钥
@@ -219,15 +220,15 @@ impl SecurityManager {
     /// 验证RSA签名
     fn verify_rsa_signature(&self, data: &[u8], signature: &PackageSignature) -> PackageResult<bool> {
         // 解码公钥
-        let public_key_bytes = base64::decode(&signature.public_key)
+        let _public_key_bytes = general_purpose::STANDARD.decode(&signature.public_key)
             .map_err(|e| PackageError::package_error(&format!("公钥解码失败: {:?}", e), None))?;
         
         // 解码签名
-        let signature_bytes = base64::decode(&signature.signature)
+        let _signature_bytes = general_purpose::STANDARD.decode(&signature.signature)
             .map_err(|e| PackageError::package_error(&format!("签名解码失败: {:?}", e), None))?;
         
         // 计算数据哈希
-        let digest = digest::digest(&digest::SHA256, data);
+        let _digest = digest::digest(&digest::SHA256, data);
         
         // 验证签名（简化实现）
         // 实际实现需要根据RSA密钥格式和签名算法进行调整
@@ -270,7 +271,7 @@ impl SecurityManager {
     }
 
     /// 检查版本是否在受影响范围内
-    fn is_version_affected(&self, version: &str, affected_range: &str) -> bool {
+    fn is_version_affected(&self, _version: &str, _affected_range: &str) -> bool {
         // 简化实现，实际需要解析版本范围
         // 这里只是一个示例，实际实现需要使用版本解析库
         true
@@ -298,9 +299,9 @@ impl SecurityManager {
     }
 
     /// 扫描包漏洞
-    pub fn scan_for_vulnerabilities(&self, package_path: &Path) -> PackageResult<Vec<Vulnerability>> {
+    pub fn scan_for_vulnerabilities(&self, _package_path: &Path) -> PackageResult<Vec<Vulnerability>> {
         // 简化实现，实际需要解析包内容并检查漏洞
-        let mut vulnerabilities = Vec::new();
+        let vulnerabilities = Vec::new();
         
         // 这里只是一个示例，实际实现需要：
         // 1. 解析包内容
@@ -368,8 +369,8 @@ impl SignatureTool {
         
         Ok(PackageSignature {
             signature_type: SignatureType::Ed25519,
-            signature: base64::encode(signature.as_ref()),
-            public_key: base64::encode(&self.public_key),
+            signature: general_purpose::STANDARD.encode(signature.as_ref()),
+            public_key: general_purpose::STANDARD.encode(&self.public_key),
             timestamp: chrono::Utc::now().to_rfc3339(),
         })
     }

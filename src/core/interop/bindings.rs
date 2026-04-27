@@ -1,6 +1,6 @@
-
 // Copyright © 2026 幻心梦梦 (huanxinmengmeng)
 // Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
@@ -36,10 +36,20 @@ pub enum ExportedItem {
     },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BindGenTargetLanguage {
+    Python,
+    Kotlin,
+    Swift,
+    Go,
+    CSharp,
+    Java,
+}
+
 #[derive(Debug, Clone)]
 pub struct BindGenOptions {
     pub export_name: String,
-    pub target_languages: Vec<TargetLanguage>,
+    pub target_languages: Vec<BindGenTargetLanguage>,
     pub output_dir: PathBuf,
 }
 
@@ -48,23 +58,13 @@ impl Default for BindGenOptions {
         Self {
             export_name: "huanlib".to_string(),
             target_languages: vec![
-                TargetLanguage::Python,
-                TargetLanguage::Kotlin,
-                TargetLanguage::Swift,
+                BindGenTargetLanguage::Python,
+                BindGenTargetLanguage::Kotlin,
+                BindGenTargetLanguage::Swift,
             ],
             output_dir: PathBuf::from("generated_bindings"),
         }
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TargetLanguage {
-    Python,
-    Kotlin,
-    Swift,
-    Go,
-    CSharp,
-    Java,
 }
 
 pub struct BindingGenerator {
@@ -80,6 +80,10 @@ impl BindingGenerator {
         Self::new(BindGenOptions::default())
     }
 
+    pub fn get_output_dir(&self) -> &PathBuf {
+        &self.options.output_dir
+    }
+
     pub fn generate(&self, exported_items: &[ExportedItem]) -> Result<(), BindGenError> {
         if exported_items.is_empty() {
             return Err(BindGenError::NoExportedItems);
@@ -92,9 +96,9 @@ impl BindingGenerator {
 
         for &lang in &self.options.target_languages {
             match lang {
-                TargetLanguage::Python => self.generate_python_bindings(exported_items)?,
-                TargetLanguage::Kotlin => self.generate_kotlin_bindings(exported_items)?,
-                TargetLanguage::Swift => self.generate_swift_bindings(exported_items)?,
+                BindGenTargetLanguage::Python => self.generate_python_bindings(exported_items)?,
+                BindGenTargetLanguage::Kotlin => self.generate_kotlin_bindings(exported_items)?,
+                BindGenTargetLanguage::Swift => self.generate_swift_bindings(exported_items)?,
                 _ => {},
             }
         }

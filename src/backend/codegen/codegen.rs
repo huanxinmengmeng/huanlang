@@ -48,6 +48,8 @@ impl CodeGen {
             Item::Global(global_var) => self.generate_global(global_var),
             Item::TypeAlias(type_alias) => self.generate_type_alias(type_alias),
             Item::Extern(_) => {}
+            Item::Peripheral(peripheral) => self.generate_peripheral(peripheral),
+            Item::MemoryLayout(layout) => self.generate_memory_layout(layout),
         }
     }
 
@@ -113,6 +115,42 @@ impl CodeGen {
         self.output.push_str(&format!("{}type {} = ", visibility, type_alias.name.name));
         self.generate_type(&type_alias.ty);
         self.output.push_str(";\n");
+    }
+
+    fn generate_peripheral(&mut self, peripheral: &PeripheralDef) {
+        self.output.push_str(&format!("peripheral {} @ 0x{:X} {{\n", 
+            peripheral.name.name, peripheral.base_addr));
+        for reg in &peripheral.registers {
+            let access_str = match reg.access {
+                RegisterAccess::ReadOnly => "readonly",
+                RegisterAccess::WriteOnly => "writeonly",
+                RegisterAccess::ReadWrite => "readwrite",
+            };
+            self.output.push_str(&format!("  {} @ 0x{:X}: ", reg.name.name, reg.offset));
+            self.generate_type(&reg.ty);
+            self.output.push_str(&format!(" ({})\n", access_str));
+        }
+        self.output.push_str("}\n");
+    }
+
+    fn generate_memory_layout(&mut self, layout: &MemoryLayout) {
+        self.output.push_str(&format!("memory_layout {} {{\n", layout.name.name));
+        for region in &layout.regions {
+            self.output.push_str(&format!("  {} @ 0x{:X} size 0x{:X} (", 
+                region.name, region.start, region.size));
+            let attrs: Vec<&str> = region.attributes.iter().map(|a| match a {
+                MemoryAttr::Readable => "readable",
+                MemoryAttr::Writable => "writable",
+                MemoryAttr::Executable => "executable",
+            }).collect();
+            self.output.push_str(&attrs.join(", "));
+            self.output.push_str(")\n");
+        }
+        for segment in &layout.segments {
+            self.output.push_str(&format!("  .{} in {} align {}\n", 
+                segment.name, segment.region, segment.alignment));
+        }
+        self.output.push_str("}\n");
     }
 
     fn generate_block(&mut self, block: &Vec<Stmt>) {

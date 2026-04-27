@@ -12,7 +12,7 @@
 
 //! LSP 服务器主模块
 
-use std::collections::HashMap;
+
 
 /// LSP 服务器
 pub struct LspServer {
@@ -91,7 +91,7 @@ impl LspServer {
         // 获取当前文档
         if let Some(doc) = self.documents.get_document(uri) {
             // 获取光标处的词语
-            if let Some(word) = doc.get_word_at(&position) {
+            if let Some(_word) = doc.get_word_at(&position) {
                 let result = crate::lsp::handlers::completion::CompletionHandler::handle(
                     crate::lsp::handlers::completion::CompletionParams {
                         text_document: crate::lsp::handlers::completion::TextDocumentIdentifier::new(uri.to_string()),

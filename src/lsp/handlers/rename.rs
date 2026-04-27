@@ -12,7 +12,7 @@
 
 //! 重命名请求处理器
 
-use crate::lsp::{Position, Range, Location};
+use crate::lsp::{Position, Range};
 use std::collections::HashMap;
 
 /// 重命名请求参数
@@ -197,7 +197,7 @@ pub struct PrepareRenameHandler;
 
 impl PrepareRenameHandler {
     /// 处理准备重命名请求
-    pub fn handle(uri: &str, position: Position) -> Option<PrepareRenameResult> {
+    pub fn handle(_uri: &str, _position: Position) -> Option<PrepareRenameResult> {
         // 这里应该返回符号的范围和占位符
         // 简化实现：返回 None
         None

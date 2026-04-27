@@ -18,7 +18,7 @@ pub mod error;
 
 pub use ffi::{FFI, FFIParser, ExternBlock, ExternItem, ForeignLanguage};
 pub use transpiler::{Transpiler, TargetLanguage, SourceLanguage, HuanTranspiler};
-pub use bindings::{BindingGenerator, ExportedItem, BindGenOptions};
+pub use bindings::{BindingGenerator, ExportedItem, BindGenOptions, BindGenTargetLanguage};
 pub use error::{FFIError, TranspileError, BindGenError};
 
 #[cfg(test)]

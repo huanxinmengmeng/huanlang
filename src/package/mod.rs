@@ -43,17 +43,18 @@ pub mod config;
 pub mod dependency;
 pub mod security;
 
-pub use manifest::*;
-pub use lockfile::*;
-pub use registry::*;
-pub use resolver::*;
-pub use cache::*;
-pub use workspace::*;
-pub use commands::*;
-pub use error::*;
-pub use config::*;
-pub use dependency::*;
-pub use security::*;
+// 明确导出主要类型，避免重复导出警告
+pub use error::{PackageError, PackageResult};
+pub use manifest::{PackageManifest, PackageInfo};
+pub use config::PackageConfig;
+pub use dependency::Dependency;
+pub use commands::Command;
+pub use cache::CacheManager;
+pub use workspace::Workspace;
+pub use lockfile::PackageLock;
+pub use registry::RegistryClient;
+pub use resolver::DependencyResolver;
+pub use security::SecurityManager;
 
 /// 包管理器主函数
 pub fn main() -> ! {
