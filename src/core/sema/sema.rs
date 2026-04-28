@@ -956,6 +956,22 @@ impl TypeInfer {
                 })?;
                 Ok(())
             }
+            Item::Import(import) => {
+                // 处理导入语句
+                // 简单的导入处理：将导入路径添加到符号表
+                // 实际实现中需要解析导入路径并加载相应的模块
+                if let Some(items) = &import.items {
+                    // 选择性导入
+                    for item in items {
+                        self.symbol_table.add_import(item.name.clone(), format!("{}.{}", import.path, item.name));
+                    }
+                } else {
+                    // 导入整个模块
+                    let module_name = import.path.split('.').last().unwrap_or(&import.path);
+                    self.symbol_table.add_import(module_name.to_string(), import.path.clone());
+                }
+                Ok(())
+            }
             _ => Ok(()),
         }
     }

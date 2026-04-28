@@ -1,278 +1,210 @@
 # 幻语编程语言 (HuanLang)
 
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-v0.3.0-green.svg)](Cargo.toml)
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/huanxinmengmeng/huanlang)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
 
-幻语是一种支持中文、拼音、英文三种语言关键词的现代化编程语言，专为中文母语者设计，让编程变得更加自然和亲切。
+**幻语**是一种支持**中文、拼音、英文**三种语言关键词的现代化编程语言，专为中文母语者设计，让编程变得更加自然和亲切。
 
-## 特性
+## ✨ 核心特性
 
-### 🌍 多语言支持
-- **中文关键词**：函数、如果、当、重复、结束等
-- **英文关键词**：function, if, while, repeat, end等
-- **拼音关键词**：han_shu, ru_guo, dang, chong_fu, jie_shu等
-- **自由切换**：可以在同一文件中混合使用任意语言的关键词
+### 🌍 多语言关键词系统
+幻语最大的特色是支持三种语言的关键词，可以在同一文件中自由混合使用：
 
-### 🚀 现代编译器
-- 完整的词法分析器
-- 强大的语法解析器
-- 语义分析和类型检查
-- MLIR中间表示
-- LLVM代码生成器
-- WASM后端支持
+```
+// 中文版本
+函数 主() -> 整数 {
+    如果 x > 0 那么
+        打印("正数")
+    结束
+}
 
-### 📦 包管理系统
-- 简洁的依赖管理
-- 版本控制和解析
-- 本地缓存
-- 注册表集成
-- 工作区支持
+// 英文版本
+function main() -> int {
+    if x > 0 {
+        print("positive")
+    }
+}
 
-### 🔧 完整工具链
-- 编译器（build）
-- 解释器（run）
-- 类型检查器（check）
-- 交互式REPL
-- 代码格式化器
-- LSP服务器
-- 包管理器
+// 拼音版本
+han_shu zhu() -> zheng_shu {
+    ru_guo x > 0 na_me
+        da_yin("zheng shu")
+    jie_shu
+}
+```
 
-### 💡 语言特性
-- 强类型系统
-- 函数式编程
-- 面向对象编程（支持）
-- 并发编程（支持）
-- 内存安全（支持）
-- 跨语言互操作
+### 🚀 现代编译器架构
+- **词法分析器**：支持Unicode、CJK字符、拼音标识符
+- **语法解析器**：强大的递归下降解析器
+- **语义分析**：完整的类型推导和检查
+- **MLIR中间表示**：现代化的编译器基础设施
+- **LLVM后端**：高性能代码生成
+- **WASM支持**：WebAssembly编译目标
 
-## 快速开始
+### 📦 完整生态系统
+- **包管理器**：简洁的依赖管理、工作区支持
+- **标准库**：IO、网络、并发、数学、数据处理
+- **工具链**：编译器、解释器、REPL、格式化器、LSP
+- **文档完善**：详尽的文档和丰富的示例
 
-### 安装
+## 📚 学习资源
 
-从源代码构建：
+### 🏃 快速开始
+
+**安装：**
 ```bash
-git clone https://github.com/huanxinmengmeng/huanlang.git
+git clone https://gitee.com/huanxinmengmeng/huanlang.git
 cd huanlang
 cargo build --release
 ```
 
-### 你的第一个程序
-
-创建`hello.hl`：
-```
+**编写第一个程序：**
+```huan
+// hello.hl
 函数 主() -> 整数 {
     打印("你好，幻语世界！");
     返回 0;
 }
 ```
 
-运行程序：
+**运行：**
 ```bash
 huan run hello.hl
 ```
 
-## 语法示例
+### 📖 示例程序（13个）
 
-### 三种语言的关键词
+**基础示例：**
+- [hello_world.hl](examples/hello_world.hl) - 入门第一个程序
+- [variables.hl](examples/variables.hl) - 变量和数据类型
+- [functions.hl](examples/functions.hl) - 函数定义和使用
+- [control_flow.hl](examples/control_flow.hl) - 循环和条件判断
+- [collections.hl](examples/collections.hl) - 列表和映射
+- [fibonacci.hl](examples/fibonacci.hl) - 递归函数
 
-**中文版本：**
-```
-函数 加法(a: 整数, b: 整数) -> 整数 {
-    返回 a + b;
-}
-```
+**进阶示例：**
+- [oop.hl](examples/oop.hl) - 面向对象编程
+- [algorithms.hl](examples/algorithms.hl) - 排序算法
+- [error_handling.hl](examples/error_handling.hl) - 错误处理
 
-**英文版本：**
-```
-function add(a: int, b: int) -> int {
-    return a + b;
-}
-```
+**实用示例：**
+- [file_processing.hl](examples/file_processing.hl) - 文件处理
+- [network_example.hl](examples/network_example.hl) - 网络请求
+- [concurrency_example.hl](examples/concurrency_example.hl) - 并发编程
+- [data_processing.hl](examples/data_processing.hl) - 数据处理
 
-**拼音版本：**
-```
-han_shu jia_fa(a: zheng_shu, b: zheng_shu) -> zheng_shu {
-    fan_hui a + b;
-}
-```
+### 📖 完整文档
 
-### 完整示例
+- [用户指南](docs/用户开发使用文档/) - 语言基础教程
+- [标准库文档](docs/标准库文档.md) - 标准库参考
+- [包管理器指南](docs/幻语包管理器使用指南.md) - 包管理
+- [开发规范](docs/开发规范文档/) - 开发者文档
 
-```
-函数 阶乘(n: 整数) -> 整数 {
-    如果 n <= 1 那么
-        返回 1;
-    否则
-        返回 n * 阶乘(n - 1);
-    结束
-}
-
-函数 主() -> 整数 {
-    打印("斐波那契数列演示！");
-    
-    变量 i = 0;
-    当 i < 10 时 {
-        打印("阶乘(" + i + ") = " + 阶乘(i));
-        i = i + 1;
-    }
-    
-    返回 0;
-}
-```
-
-## 命令行使用
+## 🛠️ 命令行工具
 
 ```bash
-# 编译程序
-huan build my_program.hl
+# 编译和运行
+huan build my_program.hl       # 编译
+huan run my_program.hl         # 运行
+huan check my_program.hl      # 类型检查
 
-# 运行程序
-huan run my_program.hl
-
-# 类型检查
-huan check my_program.hl
-
-# 启动REPL
-huan repl
-
-# 格式化代码
-huan fmt my_program.hl
+# 开发工具
+huan repl                      # 交互式REPL
+huan fmt my_program.hl        # 代码格式化
+huan serve                    # LSP服务器
 
 # 包管理
-huan package init my-project
-huan package add 网络@0.3
-huan package install
-
-# 查看帮助
-huan help
-huan help build
+huan package init my-project   # 初始化项目
+huan package add 网络@0.3      # 添加依赖
+huan package install           # 安装依赖
 ```
 
-## 项目结构
+## 🏗️ 项目结构
 
 ```
 huanlang/
 ├── src/
 │   ├── core/              # 核心编译系统
-│   │   ├── lexer/        # 词法分析
-│   │   ├── parser/       # 语法解析
+│   │   ├── lexer/        # 词法分析器
+│   │   ├── parser/       # 语法解析器
 │   │   ├── sema/         # 语义分析
 │   │   ├── typeck/       # 类型检查
 │   │   ├── mlir/         # MLIR中间表示
-│   │   ├── backend/      # 代码生成后端
-│   │   ├── interop/      # 跨语言互操作
-│   │   ├── memory/       # 内存管理
-│   │   ├── concurrent/   # 并发支持
-│   │   └── performance/  # 性能子系统
+│   │   └── backend/      # 代码生成后端
 │   ├── stdlib/           # 标准库
 │   ├── package/          # 包管理器
-│   ├── tools/            # 工具链
-│   │   ├── cli/          # 命令行界面
-│   │   ├── editor/       # 编辑器
-│   │   └── hla/          # 高级语言
+│   ├── tools/           # 工具链
 │   └── lsp/              # LSP服务器
-├── examples/             # 示例程序
+├── examples/              # 示例程序（13个）
 ├── docs/                 # 文档
-└── dialects/            # MLIR方言
+└── dialects/             # MLIR方言
 ```
 
-## 示例程序
+## 📊 技术指标
 
-查看 [examples/](examples/) 目录获取完整的示例程序：
+| 指标 | 数值 |
+|------|------|
+| 代码行数 | 50,000+ |
+| 测试用例 | 375 |
+| 示例程序 | 13 |
+| 核心模块 | 20+ |
+| 标准库模块 | 8 |
+| 文档页数 | 50+ |
 
-- [hello_world.hl](examples/hello_world.hl) - 简单的Hello World
-- [variables.hl](examples/variables.hl) - 变量和类型
-- [functions.hl](examples/functions.hl) - 函数使用
-- [control_flow.hl](examples/control_flow.hl) - 控制流
-- [collections.hl](examples/collections.hl) - 集合操作
-- [fibonacci.hl](examples/fibonacci.hl) - 斐波那契数列
+## 🎯 发展路线图
 
-## 文档
+### ✅ 已完成
+- **v0.1.0** - 核心链路稳定
+- **v0.2.0** - 工具链建设
+- **v0.3.0** - 生态扩展
 
-- [开发规范文档](docs/开发规范文档/) - 编译器实现细节
-- [用户开发使用文档](docs/用户开发使用文档/) - 用户指南
-- [包管理器使用指南](docs/幻语包管理器使用指南.md) - 包管理
+### ⏳ 进行中
+- **v0.4.0** - 语言完善
+  - 完整的类型系统
+  - 所有权系统
+  - 模式匹配
 
-## 开发
+### 📅 计划中
+- **v1.0.0** - 生产就绪
+  - 完整的标准库
+  - 性能优化
+  - 稳定的API
 
-### 构建项目
+## 🤝 贡献指南
 
-```bash
-# 开发构建
-cargo build
-
-# 运行测试
-cargo test
-
-# 代码检查
-cargo clippy
-
-# 格式化
-cargo fmt
-
-# 发布构建
-cargo build --release
-```
-
-### 贡献指南
+欢迎贡献代码！请遵循以下步骤：
 
 1. Fork本项目
-2. 创建你的特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交你的更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启Pull Request
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add AmazingFeature'`)
+4. 推送分支 (`git push origin feature/AmazingFeature`)
+5. 创建Pull Request
 
-## 路线图
+## 📄 许可证
 
-### v0.1.0 - 核心链路稳定 ✅
-- ✅ 基础词法分析器
-- ✅ 基础语法解析器
-- ✅ 基础语义分析
-- ✅ LLVM代码生成基础
+本项目采用 Apache License 2.0 许可证。
 
-### v0.2.0 - 工具链建设 ✅
-- ✅ 包管理器核心功能
-- ✅ 测试框架
-- ✅ 项目模板
-- ✅ 基础标准库
+## 🙏 致谢
 
-### v0.3.0 - 生态扩展 ✅
-- ✅ LSP服务器
-- ✅ 跨语言互操作
-- ✅ 性能子系统
-- ✅ 完整的包管理功能
-
-### v0.4.0 - 语言完善
-- [ ] 完整的类型系统
-- [ ] 所有权系统
-- [ ] 错误处理
-- [ ] 模式匹配
-
-### v1.0.0 - 生产就绪
-- [ ] 完整的标准库
-- [ ] 性能优化
-- [ ] 稳定的API
-- [ ] 生产级工具链
-
-## 社区
-
-- [Gitee仓库](https://gitee.com/huanxinmengmeng/huanlang)
-- [Issues](https://gitee.com/huanxinmengmeng/huanlang/issues)
-- [Pull Requests](https://gitee.com/huanxinmengmeng/huanlang/pulls)
-
-## 许可证
-
-本项目采用 Apache License 2.0 许可证 - 详见 [LICENSE](LICENSE) 文件。
-
-## 致谢
-
-- 感谢所有为幻语项目贡献代码的开发者
-- 感谢所有使用和支持幻语的用户
-- 感谢开源社区提供的优秀工具和库
+感谢所有为幻语项目贡献代码和提出建议的开发者！
 
 ---
 
-**幻语 - 让编程更自然！** 🚀
+## 🚀 立即开始
 
-**HuanLang - Making programming more natural!** 🌟
+```bash
+# 克隆项目
+git clone https://gitee.com/huanxinmengmeng/huanlang.git
+
+# 构建
+cd huanlang
+cargo build --release
+
+# 运行示例
+./target/release/huan run examples/hello_world.hl
+```
+
+**幻语 - 让编程更自然！** 🌟
+
+**HuanLang - Making programming more natural!** 🚀

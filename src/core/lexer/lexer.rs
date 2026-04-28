@@ -149,6 +149,11 @@ impl Lexer {
                     self.advance();
                     self.skip_line_comment();
                 }
+                '/' if self.peek_char() == Some('/') => {
+                    self.advance();
+                    self.advance();
+                    self.skip_line_comment();
+                }
                 '/' if self.peek_char() == Some('*') => {
                     self.advance();
                     self.advance();

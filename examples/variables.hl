@@ -22,6 +22,15 @@
     打印("  年龄：" + age);
     打印("  PI：" + pi);
     
-    // 打印所有变量；
+    // 打印所有变量
+    打印("\n所有变量：");
+    打印("  name: " + name);
+    打印("  age: " + age);
+    打印("  count: " + count);
+    打印("  pi: " + pi);
+    打印("  price: " + price);
+    打印("  is_happy: " + is_happy);
+    打印("  is_ready: " + is_ready);
+    
     返回 0;
 }

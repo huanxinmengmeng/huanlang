@@ -49,6 +49,7 @@ const KEYWORD_TRIPLES: &[(&str, &str, &str, TokenKind)] = &[
     ("若", "ruo", "if", TokenKind::If),
     ("如果", "ruguo", "if", TokenKind::If),
     ("则", "ze", "then", TokenKind::Then),
+    ("那么", "", "then", TokenKind::Then),  // 移除拼音映射以避免与变量名冲突
     ("否则", "fouze", "else", TokenKind::Else),
     ("结束", "jieshu", "end", TokenKind::End),
     ("当", "dang", "while", TokenKind::While),
@@ -153,7 +154,9 @@ impl KeywordTable {
         // 插入所有三语关键词映射
         for &(ch, py, en, ref kind) in KEYWORD_TRIPLES {
             map.insert(ch, kind.clone());
-            map.insert(py, kind.clone());
+            if !py.is_empty() {
+                map.insert(py, kind.clone());
+            }
             map.insert(en, kind.clone());
         }
         

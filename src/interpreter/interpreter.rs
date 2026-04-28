@@ -58,27 +58,20 @@ impl Interpreter {
         // 确保设置标准库
         self.setup_stdlib();
         
-        println!("DEBUG: 程序包含 {} 个顶层定义", program.len());
-        for (i, item) in program.iter().enumerate() {
-            println!("DEBUG: 处理顶层定义 {}: {:?}", i, item);
+        for item in program.iter() {
             self.execute_item(item)?;
         }
-
-        println!("DEBUG: 环境中的函数: {:?}", self.env.functions.keys());
         
         if let Some(main_func) = self.env.get_function("主").cloned() {
-            println!("DEBUG: 找到中文主函数");
             let args: Vec<Value> = vec![];
             return self.execute_function_body(&main_func.body, main_func.params, args);
         }
 
         if let Some(main_func) = self.env.get_function("main").cloned() {
-            println!("DEBUG: 找到英文主函数");
             let args: Vec<Value> = vec![];
             return self.execute_function_body(&main_func.body, main_func.params, args);
         }
 
-        println!("DEBUG: 未找到主函数");
         Ok(Value::Unit)
     }
 
@@ -157,7 +150,65 @@ impl Interpreter {
                 Ok(Value::Unit)
             }
             Stmt::Expr(expr, _) => {
-                self.evaluate_expr(expr)
+                match &**expr {
+                    Expr::MethodCall { receiver: array_expr, method, args, .. } if method.name == "添加" => {
+                        // 处理数组添加操作，需要将结果赋值回原变量
+                        let result = self.evaluate_expr(expr)?;
+                        if let Expr::Ident(ident) = &**array_expr {
+                            self.env.set_var(ident.name.clone(), result);
+                        }
+                        Ok(Value::Unit)
+                    }
+                    Expr::Call { func, args, .. } if args.len() == 3 => {
+                        if let Expr::Ident(ident) = &**func {
+                            if ident.name == "设置" {
+                                // 处理数组设置操作，需要将结果赋值回原变量
+                                let result = self.evaluate_expr(expr)?;
+                                if let Expr::Ident(array_ident) = &args[0] {
+                                    self.env.set_var(array_ident.name.clone(), result);
+                                }
+                                return Ok(Value::Unit);
+                            }
+                        }
+                        self.evaluate_expr(expr)
+                    }
+                    Expr::BinaryOp { op: BinaryOp::Assign, left, right, .. } => {
+                        // 处理赋值表达式
+                        let value = self.evaluate_expr(right)?;
+                        match left.as_ref() {
+                            Expr::Ident(ident) => {
+                                self.env.set_var(ident.name.clone(), value);
+                            }
+                            Expr::Index { target: array_expr, index: index_expr, .. } => {
+                                // 处理数组索引赋值
+                                let array_val = self.evaluate_expr(array_expr)?;
+                                let index_val = self.evaluate_expr(index_expr)?;
+                                
+                                if let (Value::List(mut items), Value::Int(i)) = (array_val, index_val) {
+                                    let idx = i as usize;
+                                    if idx < items.len() {
+                                        items[idx] = value;
+                                        // 找到原始变量并更新
+                                        if let Expr::Ident(ident) = array_expr.as_ref() {
+                                            self.env.set_var(ident.name.clone(), Value::List(items));
+                                        }
+                                    } else {
+                                        return Err("数组索引越界".to_string());
+                                    }
+                                } else {
+                                    return Err("无效的数组索引赋值".to_string());
+                                }
+                            }
+                            _ => {
+                                return Err("只支持对变量或数组索引的赋值".to_string());
+                            }
+                        }
+                        Ok(Value::Unit)
+                    }
+                    _ => {
+                        self.evaluate_expr(expr)
+                    }
+                }
             }
             Stmt::Return(opt_expr, _) => {
                 match opt_expr {
@@ -248,8 +299,33 @@ impl Interpreter {
             }
             Stmt::Assign { target, value, .. } => {
                 let value = self.evaluate_expr(value)?;
-                if let Expr::Ident(ident) = target.as_ref() {
-                    self.env.set_var(ident.name.clone(), value);
+                match target.as_ref() {
+                    Expr::Ident(ident) => {
+                        self.env.set_var(ident.name.clone(), value);
+                    }
+                    Expr::Index { target: array_expr, index: index_expr, .. } => {
+                        // 处理数组索引赋值
+                        let array_val = self.evaluate_expr(array_expr)?;
+                        let index_val = self.evaluate_expr(index_expr)?;
+                        
+                        if let (Value::List(mut items), Value::Int(i)) = (array_val, index_val) {
+                            let idx = i as usize;
+                            if idx < items.len() {
+                                items[idx] = value;
+                                // 找到原始变量并更新
+                                if let Expr::Ident(ident) = array_expr.as_ref() {
+                                    self.env.set_var(ident.name.clone(), Value::List(items));
+                                }
+                            } else {
+                                return Err("数组索引越界".to_string());
+                            }
+                        } else {
+                            return Err("无效的数组索引赋值".to_string());
+                        }
+                    }
+                    _ => {
+                        return Err("只支持对变量或数组索引的赋值".to_string());
+                    }
                 }
                 Ok(Value::Unit)
             }
@@ -357,6 +433,42 @@ impl Interpreter {
                     _ => Err("字符串不支持该运算符".to_string()),
                 }
             }
+            (Value::String(l), Value::Int(r)) => {
+                match op {
+                    BinaryOp::Add => Ok(Value::String(l.clone() + &r.to_string())),
+                    _ => Err("字符串不支持该运算符".to_string()),
+                }
+            }
+            (Value::Int(l), Value::String(r)) => {
+                match op {
+                    BinaryOp::Add => Ok(Value::String(l.to_string() + r)),
+                    _ => Err("整数不支持该运算符".to_string()),
+                }
+            }
+            (Value::String(l), Value::Float(r)) => {
+                match op {
+                    BinaryOp::Add => Ok(Value::String(l.clone() + &r.to_string())),
+                    _ => Err("字符串不支持该运算符".to_string()),
+                }
+            }
+            (Value::Float(l), Value::String(r)) => {
+                match op {
+                    BinaryOp::Add => Ok(Value::String(l.to_string() + r)),
+                    _ => Err("浮点数不支持该运算符".to_string()),
+                }
+            }
+            (Value::String(l), Value::Bool(r)) => {
+                match op {
+                    BinaryOp::Add => Ok(Value::String(l.clone() + &r.to_string())),
+                    _ => Err("字符串不支持该运算符".to_string()),
+                }
+            }
+            (Value::Bool(l), Value::String(r)) => {
+                match op {
+                    BinaryOp::Add => Ok(Value::String(l.to_string() + r)),
+                    _ => Err("布尔值不支持该运算符".to_string()),
+                }
+            }
             (Value::Bool(l), Value::Bool(r)) => {
                 match op {
                     BinaryOp::And => Ok(Value::Bool(*l && *r)),
@@ -386,27 +498,20 @@ impl Interpreter {
             Expr::Ident(ident) => ident.name.clone(),
             _ => return Err("仅支持直接函数调用".to_string()),
         };
-
-        println!("DEBUG: 调用函数: {}", func_name);
         
         let evaluated_args: Result<Vec<Value>, String> = args.iter().map(|arg| self.evaluate_expr(arg)).collect();
         let evaluated_args = evaluated_args?;
 
         // 检查是否是内置函数（优先）
-        println!("DEBUG: 检查内置函数");
         if let Some(result) = self.eval_builtin_function(&func_name, &evaluated_args) {
-            println!("DEBUG: 调用内置函数成功");
             return result;
         }
         
         // 检查是否是用户定义的函数
-        println!("DEBUG: 检查用户定义函数");
         if let Some(func_def) = self.env.get_function(&func_name).cloned() {
-            println!("DEBUG: 调用用户定义函数成功");
             return self.execute_function_body(&func_def.body, func_def.params, evaluated_args);
         }
         
-        println!("DEBUG: 未找到函数: {}", func_name);
         Err(format!("未找到函数: {}", func_name))
     }
     
@@ -446,6 +551,25 @@ impl Interpreter {
                     io::stdout().flush().unwrap();
                 }
                 Some(Ok(Value::Unit))
+            }
+            "设置" => {
+                // 处理数组设置操作
+                if args.len() == 3 {
+                    if let (Value::List(items), Value::Int(i), value) = (&args[0], &args[1], &args[2]) {
+                        let idx = *i as usize;
+                        if idx < items.len() {
+                            let mut new_items = items.clone();
+                            new_items[idx] = value.clone();
+                            return Some(Ok(Value::List(new_items)));
+                        } else {
+                            return Some(Err("数组索引越界".to_string()));
+                        }
+                    } else {
+                        return Some(Err("无效的设置操作参数".to_string()));
+                    }
+                } else {
+                    return Some(Err("设置操作需要3个参数".to_string()));
+                }
             }
             "退出" | "exit" | "tuichu" => {
                 let code = args.first().and_then(|v| v.as_int()).unwrap_or(0);
@@ -556,7 +680,8 @@ impl Interpreter {
         let object = self.evaluate_expr(receiver)?;
         let method_name = &method.name;
 
-        let _evaluated_args: Result<Vec<Value>, String> = args.iter().map(|arg| self.evaluate_expr(arg)).collect();
+        let evaluated_args: Result<Vec<Value>, String> = args.iter().map(|arg| self.evaluate_expr(arg)).collect();
+        let evaluated_args = evaluated_args?;
 
         match (&object, method_name.as_str()) {
             (Value::Int(n), "到字符串" | "to_string") => {
@@ -570,6 +695,12 @@ impl Interpreter {
             }
             (Value::Bool(b), "到字符串" | "to_string") => {
                 Ok(Value::String(b.to_string()))
+            }
+            (Value::List(items), "添加") if evaluated_args.len() == 1 => {
+                // 处理数组添加操作
+                let mut new_items = items.clone();
+                new_items.push(evaluated_args[0].clone());
+                Ok(Value::List(new_items))
             }
             _ => Err(format!("类型 {} 上未找到方法: {}", object.type_name(), method_name)),
         }

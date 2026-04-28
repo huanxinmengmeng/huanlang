@@ -464,9 +464,44 @@ impl Parser {
             }
         };
         
+        let mut items = None;
+        
+        // 检查是否有选择性导入
+        if self.check_keyword(&["导入", "import"]) {
+            self.advance();
+            if self.eat(TokenKind::LBrace).is_some() {
+                let mut import_items = Vec::new();
+                loop {
+                    let item_tok = self.expect_ident("import item")?;
+                    let ident = match item_tok.kind {
+                        TokenKind::Ident(name) => Ident::new(name, item_tok.span),
+                        _ => {
+                            return Err(ParseError::UnexpectedToken {
+                                expected: "identifier".to_string(),
+                                found: item_tok.clone(),
+                                span: item_tok.span,
+                            });
+                        }
+                    };
+                    import_items.push(ident);
+                    
+                    if self.eat(TokenKind::Comma).is_none() {
+                        break;
+                    }
+                }
+                self.expect(TokenKind::RBrace, "}")?;
+                items = Some(import_items);
+            }
+        } else if self.check_keyword(&["为", "as"]) {
+            self.advance();
+            // 导入并指定别名
+            let alias_tok = self.expect_ident("alias")?;
+            // 这里可以扩展为支持别名的导入
+        }
+        
         let span = start.merge(self.current_span());
         Ok(Item::Import(Import {
-            items: None,
+            items,
             path,
             span,
         }))
@@ -562,6 +597,13 @@ impl Parser {
 
     fn parse_type(&mut self) -> Result<Type, ParseError> {
         let tok = self.current().cloned().unwrap_or_else(|| Token::eof(SourcePosition::new(0,0,0)));
+
+        if self.check(TokenKind::LBracket) {
+            self.advance();
+            self.expect(TokenKind::RBracket, "]")?;
+            let elem_type = self.parse_type()?;
+            return Ok(Type::List(Box::new(elem_type)));
+        }
 
         match &tok.kind {
             TokenKind::Ident(name) => {
@@ -692,17 +734,7 @@ impl Parser {
         if self.check(TokenKind::LBrace) {
             self.advance();
             let mut stmts = Vec::new();
-            while !self.check(TokenKind::RBrace) && !self.is_eof()
-                && !self.check(TokenKind::End)
-                && !self.check(TokenKind::Else)
-                && !self.check(TokenKind::If)
-                && !self.check(TokenKind::While)
-                && !self.check(TokenKind::Repeat)
-                && !self.check(TokenKind::For)
-                && !self.check(TokenKind::Match)
-                && !self.check(TokenKind::Break)
-                && !self.check(TokenKind::Continue)
-            {
+            while !self.check(TokenKind::RBrace) && !self.is_eof() {
                 stmts.push(self.parse_stmt()?);
             }
 
@@ -715,10 +747,6 @@ impl Parser {
             while !self.check(TokenKind::End) && !self.is_eof()
                 && !self.check(TokenKind::RBrace)
                 && !self.check(TokenKind::Else)
-                && !self.check(TokenKind::If)
-                && !self.check(TokenKind::While)
-                && !self.check(TokenKind::Repeat)
-                && !self.check(TokenKind::For)
                 && !self.check(TokenKind::Break)
                 && !self.check(TokenKind::Continue)
             {
@@ -735,9 +763,6 @@ impl Parser {
         let mut stmts = Vec::new();
         while !self.check(TokenKind::End) && !self.check(TokenKind::RBrace) && !self.is_eof()
             && !self.check(TokenKind::Else)
-            && !self.check(TokenKind::While)
-            && !self.check(TokenKind::Repeat)
-            && !self.check(TokenKind::For)
             && !self.check(TokenKind::Break)
             && !self.check(TokenKind::Continue)
         {
@@ -940,8 +965,8 @@ impl Parser {
         let start = self.current_span();
         self.eat(TokenKind::While);
         let cond = self.parse_expr()?;
-        // 跳过可选的 "循环" 关键词
-        if self.check(TokenKind::While) && !self.check_keyword(&["开始", "begin"]) {
+        // 跳过 "时" 关键词
+        if self.check_keyword(&["时"]) {
             self.advance();
         }
         let body = self.parse_block()?;
@@ -1193,6 +1218,10 @@ impl Parser {
         let mut lhs = self.parse_prefix()?;
 
         loop {
+            // 先解析 postfix 运算符
+            lhs = self.parse_postfix(lhs)?;
+
+            // 检查是否有 infix 运算符
             let Some(tok) = self.current() else {
                 break;
             };
@@ -1204,53 +1233,6 @@ impl Parser {
                 break;
             }
             lhs = self.parse_infix(lhs, prec)?;
-        }
-
-        lhs = self.parse_postfix(lhs)?;
-
-        // 再次检查当前 Token 是否是中缀运算符，处理类似 "a + b.c" 的情况
-        if let Some(tok) = self.current() {
-            let prec = self.get_infix_precedence(&tok.kind);
-            if prec >= min_prec && self.is_infix_operator(&tok.kind) {
-                let op_tok = tok.clone();
-                self.advance();
-                let rhs = self.parse_expr_with_precedence(prec + 1)?;
-                let span = lhs.span().merge(rhs.span());
-                let op = match op_tok.kind {
-                    TokenKind::Plus | TokenKind::Add => BinaryOp::Add,
-                    TokenKind::Minus | TokenKind::Sub => BinaryOp::Sub,
-                    TokenKind::Star | TokenKind::Mul => BinaryOp::Mul,
-                    TokenKind::Slash | TokenKind::Div => BinaryOp::Div,
-                    TokenKind::Percent | TokenKind::Mod => BinaryOp::Mod,
-                    TokenKind::And => BinaryOp::And,
-                    TokenKind::Or => BinaryOp::Or,
-                    TokenKind::Eq | TokenKind::EqEq => BinaryOp::Eq,
-                    TokenKind::Ne => BinaryOp::Ne,
-                    TokenKind::Lt => BinaryOp::Lt,
-                    TokenKind::Gt => BinaryOp::Gt,
-                    TokenKind::Le => BinaryOp::Le,
-                    TokenKind::Ge => BinaryOp::Ge,
-                    TokenKind::BitAnd => BinaryOp::BitAnd,
-                    TokenKind::BitOr => BinaryOp::BitOr,
-                    TokenKind::BitXor => BinaryOp::BitXor,
-                    TokenKind::Shl => BinaryOp::Shl,
-                    TokenKind::Shr => BinaryOp::Shr,
-                    TokenKind::Assign => BinaryOp::Assign,
-                    TokenKind::PlusEq => BinaryOp::AddAssign,
-                    TokenKind::MinusEq => BinaryOp::SubAssign,
-                    TokenKind::StarEq => BinaryOp::MulAssign,
-                    TokenKind::SlashEq => BinaryOp::DivAssign,
-                    TokenKind::PercentEq => BinaryOp::ModAssign,
-                    _ => BinaryOp::Add,
-                };
-                let new_lhs = Expr::BinaryOp {
-                    left: Box::new(lhs),
-                    right: Box::new(rhs),
-                    op,
-                    span,
-                };
-                return Ok(new_lhs);
-            }
         }
 
         Ok(lhs)
@@ -1312,28 +1294,88 @@ impl Parser {
                                 span,
                             };
                         }
-                        TokenKind::LParen => {
-                    self.advance();
-                    let mut args = Vec::new();
-                    while !self.check(TokenKind::RParen) && !self.is_eof()
-                        && !self.check(TokenKind::End) && !self.check(TokenKind::RBrace)
-                        && !self.check(TokenKind::Semicolon) && !self.check(TokenKind::Comma)
-                        && !self.check(TokenKind::FatArrow)
-                    {
-                        args.push(self.parse_expr()?);
-
-                        if self.eat(TokenKind::Comma).is_none() {
-                            break;
+                        TokenKind::Ident(ref name) if name == "长度" => {
+                            // 处理 arr 长度
+                            let tok_span = tok.span;
+                            self.advance();
+                            let span = expr.span().merge(self.current_span());
+                            expr = Expr::Field {
+                                target: Box::new(expr),
+                                field: Ident::new("长度".to_string(), tok_span),
+                                span,
+                            };
                         }
-                    }
-                    let span = expr.span().merge(self.current_span());
-                    self.expect(TokenKind::RParen, ")")?;
-                    expr = Expr::Call {
-                        func: Box::new(expr),
-                        args,
-                        span,
-                    };
-                }
+                        TokenKind::Ident(ref name) if name == "获取" => {
+                            // 处理 arr 获取 j
+                            self.advance();
+                            let index = self.parse_expr_with_precedence(PREC_UNARY)?;
+                            let span = expr.span().merge(self.current_span());
+                            expr = Expr::Index {
+                                target: Box::new(expr),
+                                index: Box::new(index),
+                                span,
+                            };
+                        }
+                        TokenKind::Ident(ref name) if name == "设置" => {
+                            // 处理 arr 设置 j 为 value
+                            let tok_span = tok.span;
+                            self.advance();
+                            let index = self.parse_expr_with_precedence(PREC_LOWEST)?;
+                            if !self.check_keyword(&["为", "as"]) {
+                                return Err(ParseError::UnexpectedToken {
+                                    expected: "为".to_string(),
+                                    found: self.current().unwrap().clone(),
+                                    span: self.current_span(),
+                                });
+                            }
+                            self.advance();
+                            let value = self.parse_expr_with_precedence(PREC_LOWEST)?;
+                            // 这里我们需要特殊处理，因为设置操作会被转换为赋值语句
+                            // 我们将返回一个特殊的表达式，然后在解释器中处理
+                            let span = expr.span().merge(self.current_span());
+                            // 暂时返回一个占位表达式，实际处理会在解释器中进行
+                            expr = Expr::Call {
+                                func: Box::new(Expr::Ident(Ident::new("设置".to_string(), tok_span))),
+                                args: vec![expr, index, value],
+                                span,
+                            };
+                        }
+                        TokenKind::Ident(ref name) if name == "添加" => {
+                            // 处理 arr 添加 value
+                            let tok_span = tok.span;
+                            self.advance();
+                            let value = self.parse_expr_with_precedence(PREC_LOWEST)?;
+                            let span = expr.span().merge(self.current_span());
+                            // 创建一个方法调用表达式
+                            expr = Expr::MethodCall {
+                                receiver: Box::new(expr),
+                                method: Ident::new("添加".to_string(), tok_span),
+                                args: vec![value],
+                                span,
+                            };
+                        }
+                        TokenKind::LParen => {
+                            self.advance();
+                            let mut args = Vec::new();
+                            while !self.check(TokenKind::RParen) && !self.is_eof()
+                                && !self.check(TokenKind::End) && !self.check(TokenKind::RBrace)
+                                && !self.check(TokenKind::Semicolon) && !self.check(TokenKind::Comma)
+                                && !self.check(TokenKind::FatArrow)
+                            {
+                                args.push(self.parse_expr()?);
+
+                                if self.eat(TokenKind::Comma).is_none() {
+                                    break;
+                                }
+                            }
+                            let span = expr.span().merge(self.current_span());
+                            self.expect(TokenKind::RParen, ")")?;
+                            expr = Expr::Call {
+                                func: Box::new(expr),
+                                args,
+                                span,
+                            };
+                        }
                         _ => break,
                     }
                 }
@@ -1410,6 +1452,18 @@ impl Parser {
             TokenKind::False => {
                 self.advance();
                 Ok(Expr::BoolLit(false, span))
+            }
+            TokenKind::LBracket => {
+                self.advance();
+                let mut elements = Vec::new();
+                while !self.check(TokenKind::RBracket) && !self.is_eof() {
+                    elements.push(self.parse_expr()?);
+                    if self.eat(TokenKind::Comma).is_none() {
+                        break;
+                    }
+                }
+                self.expect(TokenKind::RBracket, "]")?;
+                Ok(Expr::List(elements, span))
             }
             TokenKind::Null => {
                 self.advance();
