@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::core::lexer::token::SourceSpan;
+use crate::core::lexer::token::{SourceSpan, SourcePosition};
 
 // ==========================================
 // 5.2 通用节点定义
@@ -242,8 +242,39 @@ pub enum Expr {
         span: SourceSpan,
     },
 
+    // 泛型类型参数
+    Generic {
+        target: Box<Expr>,
+        args: Vec<Type>,
+        span: SourceSpan,
+    },
+
+    // 块表达式
+    Block {
+        stmts: Vec<Stmt>,
+        span: SourceSpan,
+    },
+
     // 内联汇编
     Asm(InlineAsm),
+
+    // 异步表达式
+    Async {
+        expr: Box<Expr>,
+        span: SourceSpan,
+    },
+
+    // 等待表达式
+    Await {
+        expr: Box<Expr>,
+        span: SourceSpan,
+    },
+
+    // 生成任务表达式
+    Spawn {
+        expr: Box<Expr>,
+        span: SourceSpan,
+    },
 }
 
 impl Expr {
@@ -270,7 +301,12 @@ impl Expr {
             Expr::Match { span, .. } => *span,
             Expr::Try { span, .. } => *span,
             Expr::TypeAssertion { span, .. } => *span,
+            Expr::Generic { span, .. } => *span,
+            Expr::Block { span, .. } => *span,
             Expr::Asm(asm) => asm.span,
+            Expr::Async { span, .. } => *span,
+            Expr::Await { span, .. } => *span,
+            Expr::Spawn { span, .. } => *span,
         }
     }
 }
@@ -313,6 +349,8 @@ pub enum UnaryOp {
     Not,
     Neg,
     BitNot,
+    Ref,    // 取地址 &
+    Deref,  // 解引用 *
 }
 
 // ==========================================
@@ -508,6 +546,8 @@ pub enum Item {
     Global(Global),
     Peripheral(PeripheralDef),
     MemoryLayout(MemoryLayout),
+    Segment(SegmentDef),
+    SegmentBlock(Vec<SegmentDef>),
 }
 
 impl Item {
@@ -524,6 +564,16 @@ impl Item {
             Item::Global(g) => g.span,
             Item::Peripheral(p) => p.span,
             Item::MemoryLayout(m) => m.span,
+            Item::Segment(s) => s.span,
+            Item::SegmentBlock(segments) => {
+                if let Some(first) = segments.first() {
+                    if let Some(last) = segments.last() {
+                        return first.span.merge(last.span);
+                    }
+                    return first.span;
+                }
+                SourceSpan::new(SourcePosition::new(0, 0, 0), SourcePosition::new(0, 0, 0))
+            }
         }
     }
 }
@@ -587,6 +637,7 @@ pub struct SegmentDef {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Function {
     pub public: bool,
+    pub is_async: bool,
     pub name: Ident,
     pub generics: Vec<GenericParam>,
     pub params: Vec<(Ident, Type)>,
@@ -603,8 +654,11 @@ pub struct Struct {
     pub public: bool,
     pub name: Ident,
     pub generics: Vec<GenericParam>,
+    pub extends: Option<Path>,
+    pub implements: Vec<Path>,
     pub where_clause: Vec<WherePredicate>,
     pub fields: Vec<(Ident, Type, Option<Expr>)>,
+    pub methods: Vec<Function>,
     pub span: SourceSpan,
 }
 

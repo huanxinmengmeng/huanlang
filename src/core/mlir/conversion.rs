@@ -104,6 +104,8 @@ impl AstToMlirConverter {
             Item::Global(_global) => Err(ConversionError::Other("全局变量转换".to_string())),
             Item::Peripheral(_peripheral) => Err(ConversionError::Other("外设定义转换".to_string())),
             Item::MemoryLayout(_layout) => Err(ConversionError::Other("内存布局转换".to_string())),
+            Item::Segment(_segment) => Err(ConversionError::Other("段定义转换".to_string())),
+            Item::SegmentBlock(_segments) => Err(ConversionError::Other("段定义块转换".to_string())),
         }
     }
     
@@ -438,6 +440,16 @@ impl AstToMlirConverter {
                             operand,
                             span: span.clone(),
                         }))
+                    }
+                    UnaryOp::Ref => {
+                        let operand = self.convert_expr(expr)?;
+                        // 取地址操作 - 暂时返回原表达式
+                        Ok(operand)
+                    }
+                    UnaryOp::Deref => {
+                        let operand = self.convert_expr(expr)?;
+                        // 解引用操作 - 暂时返回原表达式
+                        Ok(operand)
                     }
                 }
             }

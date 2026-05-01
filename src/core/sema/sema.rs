@@ -554,6 +554,21 @@ impl TypeInfer {
                         }
                         Ok(t_expr)
                     }
+                    UnaryOp::Ref => {
+                        // 取地址操作返回指针类型
+                        Ok(Type::Ptr(Box::new(t_expr)))
+                    }
+                    UnaryOp::Deref => {
+                        // 解引用操作需要指针类型
+                        match t_expr {
+                            Type::Ptr(inner) => Ok(*inner.clone()),
+                            _ => Err(TypeError::InvalidUnaryOperation {
+                                op: "解引用".to_string(),
+                                ty: t_expr,
+                                span: *span,
+                            }),
+                        }
+                    }
                 }
             }
 
@@ -714,6 +729,34 @@ impl TypeInfer {
                 let _ty = ty;
                 let _span = span;
                 Ok(self.fresh_var())
+            }
+
+            Expr::Generic { target, args, span: _ } => {
+                let _t_target = self.infer_expr(target)?;
+                let _args = args;
+                Ok(self.fresh_var())
+            }
+
+            Expr::Block { stmts, span: _ } => {
+                for stmt in stmts {
+                    self.infer_stmt(stmt)?;
+                }
+                Ok(self.fresh_var())
+            }
+
+            Expr::Async { expr, .. } => {
+                let _t_inner = self.infer_expr(expr)?;
+                Ok(Type::Named(Path::from_ident(Ident::dummy("Future"))))
+            }
+
+            Expr::Await { expr, .. } => {
+                let _t_future = self.infer_expr(expr)?;
+                Ok(self.fresh_var())
+            }
+
+            Expr::Spawn { expr, .. } => {
+                let _t_inner = self.infer_expr(expr)?;
+                Ok(Type::Named(Path::from_ident(Ident::dummy("Task"))))
             }
         }
     }
@@ -972,8 +1015,72 @@ impl TypeInfer {
                 }
                 Ok(())
             }
+            Item::Extern(extern_block) => {
+                self.collect_extern_block(extern_block)?;
+                Ok(())
+            }
             _ => Ok(()),
         }
+    }
+
+    fn collect_extern_block(&mut self, extern_block: &ExternBlock) -> Result<(), TypeError> {
+        for item in &extern_block.items {
+            match item {
+                ExternItem::Static { name, ty, .. } => {
+                    self.symbol_table.define(
+                        name.name.clone(),
+                        SymbolKind::Constant,
+                        ty.clone(),
+                        false,
+                        Visibility::Private,
+                        name.span,
+                    ).map_err(|e| {
+                        match e {
+                            SemanticError::DuplicateDefinition { name: _, first: _, second } => {
+                                TypeError::Mismatch {
+                                    expected: Type::Unit,
+                                    found: Type::Unit,
+                                    span: second,
+                                }
+                            }
+                            _ => TypeError::Mismatch {
+                                expected: Type::Unit,
+                                found: Type::Unit,
+                                span: SourceSpan::dummy(),
+                            }
+                        }
+                    })?;
+                }
+                ExternItem::Function { name, params, return_type, .. } => {
+                    let param_types = params.iter().map(|(_, t)| t.clone()).collect();
+                    let ty = Type::Func(param_types, Box::new(return_type.clone()));
+                    self.symbol_table.define(
+                        name.name.clone(),
+                        SymbolKind::Function,
+                        ty,
+                        false,
+                        Visibility::Private,
+                        name.span,
+                    ).map_err(|e| {
+                        match e {
+                            SemanticError::DuplicateDefinition { name: _, first: _, second } => {
+                                TypeError::Mismatch {
+                                    expected: Type::Unit,
+                                    found: Type::Unit,
+                                    span: second,
+                                }
+                            }
+                            _ => TypeError::Mismatch {
+                                expected: Type::Unit,
+                                found: Type::Unit,
+                                span: SourceSpan::dummy(),
+                            }
+                        }
+                    })?;
+                }
+            }
+        }
+        Ok(())
     }
 
     fn check_item(&mut self, item: &Item) -> Result<(), TypeError> {

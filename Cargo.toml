@@ -1,6 +1,6 @@
 [package]
 name = "huanlang"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 authors = ["幻心梦梦（huanxinmengmeng）"]
 description = "幻语（HuanLang）编程语言 - 支持中文、拼音、英文三语关键词的现代化编程语言"

@@ -50,6 +50,8 @@ impl CodeGen {
             Item::Extern(_) => {}
             Item::Peripheral(peripheral) => self.generate_peripheral(peripheral),
             Item::MemoryLayout(layout) => self.generate_memory_layout(layout),
+            Item::Segment(_segment) => {},
+            Item::SegmentBlock(_segments) => {},
         }
     }
 
@@ -516,6 +518,39 @@ impl CodeGen {
                 self.output.push_str("try ");
                 self.generate_expr(expr);
             }
+            Expr::Generic { target, args, .. } => {
+                self.generate_expr(target);
+                self.output.push_str("<");
+                for (i, arg) in args.iter().enumerate() {
+                    if i > 0 {
+                        self.output.push_str(", ");
+                    }
+                    self.generate_type(arg);
+                }
+                self.output.push_str(">");
+            }
+            Expr::Block { stmts, .. } => {
+                self.output.push_str("{");
+                for stmt in stmts {
+                    self.generate_stmt(stmt);
+                }
+                self.output.push_str("}");
+            }
+
+            Expr::Async { expr, .. } => {
+                self.output.push_str("async ");
+                self.generate_expr(expr);
+            }
+
+            Expr::Await { expr, .. } => {
+                self.output.push_str("await ");
+                self.generate_expr(expr);
+            }
+
+            Expr::Spawn { expr, .. } => {
+                self.output.push_str("spawn ");
+                self.generate_expr(expr);
+            }
         }
     }
 
@@ -626,6 +661,8 @@ impl CodeGen {
             UnaryOp::Neg => "-",
             UnaryOp::Not => "!",
             UnaryOp::BitNot => "~",
+            UnaryOp::Ref => "&",
+            UnaryOp::Deref => "*",
         }
     }
 

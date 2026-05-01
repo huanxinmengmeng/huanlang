@@ -1,8 +1,12 @@
-# 幻语编程语言 (HuanLang)
+<div align="center">
+  <img src="images/logo.png" alt="幻语编程语言" width="200" height="200">
 
-[![Version](https://img.shields.io/badge/version-v0.3.0-green.svg)](Cargo.toml)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
+  # 幻语编程语言 (HuanLang)
+
+  [![Version](https://img.shields.io/badge/version-v0.4.0-green.svg)](Cargo.toml)
+  [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+  [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
+</div>
 
 **幻语**是一种支持**中文、拼音、英文**三种语言关键词的现代化编程语言，专为中文母语者设计，让编程变得更加自然和亲切。
 
@@ -11,7 +15,7 @@
 ### 🌍 多语言关键词系统
 幻语最大的特色是支持三种语言的关键词，可以在同一文件中自由混合使用：
 
-```
+```huan
 // 中文版本
 函数 主() -> 整数 {
     如果 x > 0 那么
@@ -61,7 +65,7 @@ cargo build --release
 
 **编写第一个程序：**
 ```huan
-// hello.hl
+// 你好世界.hl
 函数 主() -> 整数 {
     打印("你好，幻语世界！");
     返回 0;
@@ -70,35 +74,59 @@ cargo build --release
 
 **运行：**
 ```bash
-huan run hello.hl
+huan run examples/basic/你好世界.hl
 ```
 
-### 📖 示例程序（13个）
+### 📖 示例程序（27个）
 
 **基础示例：**
-- [hello_world.hl](examples/hello_world.hl) - 入门第一个程序
-- [variables.hl](examples/variables.hl) - 变量和数据类型
-- [functions.hl](examples/functions.hl) - 函数定义和使用
-- [control_flow.hl](examples/control_flow.hl) - 循环和条件判断
-- [collections.hl](examples/collections.hl) - 列表和映射
-- [fibonacci.hl](examples/fibonacci.hl) - 递归函数
+- [你好世界.hl](examples/basic/你好世界.hl) - 入门第一个程序
+- [变量示例.hl](examples/basic/变量示例.hl) - 变量和数据类型
+- [控制流示例.hl](examples/basic/控制流示例.hl) - 循环和条件判断
+- [基础语法全览.hl](examples/basic/基础语法全览.hl) - 完整基础语法
+- [控制流全览.hl](examples/basic/控制流全览.hl) - 循环结构全览
 
-**进阶示例：**
-- [oop.hl](examples/oop.hl) - 面向对象编程
-- [algorithms.hl](examples/algorithms.hl) - 排序算法
-- [error_handling.hl](examples/error_handling.hl) - 错误处理
+**函数示例：**
+- [函数示例.hl](examples/functions/函数示例.hl) - 函数定义和使用
+- [函数与递归全览.hl](examples/functions/函数与递归全览.hl) - 递归函数
+
+**数据结构示例：**
+- [集合示例.hl](examples/data_structures/集合示例.hl) - 列表和映射
+- [结构体示例.hl](examples/data_structures/结构体示例.hl) - 结构体定义和使用
+- [算法示例.hl](examples/data_structures/算法示例.hl) - 排序算法
+- [数据结构全览.hl](examples/data_structures/数据结构全览.hl) - 完整数据结构
+
+**面向对象与进阶示例：**
+- [面向对象示例.hl](examples/oop/面向对象示例.hl) - 面向对象编程
+- [方法调用示例.hl](examples/oop/方法调用示例.hl) - 方法定义和调用
+- [排序算法示例.hl](examples/oop/排序算法示例.hl) - 排序算法实现
+- [综合示例.hl](examples/综合示例.hl) - 综合示例
+
+**错误处理与并发示例：**
+- [错误处理示例.hl](examples/error_handling/错误处理示例.hl) - 错误处理
+- [并发示例.hl](examples/concurrency/并发示例.hl) - 并发编程
 
 **实用示例：**
-- [file_processing.hl](examples/file_processing.hl) - 文件处理
-- [network_example.hl](examples/network_example.hl) - 网络请求
-- [concurrency_example.hl](examples/concurrency_example.hl) - 并发编程
-- [data_processing.hl](examples/data_processing.hl) - 数据处理
+- [文件处理示例.hl](examples/file_io/文件处理示例.hl) - 文件读写
+- [网络请求示例.hl](examples/network/网络请求示例.hl) - HTTP请求
+- [数据处理示例.hl](examples/comprehensive/数据处理示例.hl) - 数据处理
+- [模块导入示例.hl](examples/modules/模块导入示例.hl) - 模块导入
+- [选择性导入示例.hl](examples/modules/选择性导入示例.hl) - 选择性导入
+
+**高级示例：**
+- [汇编演示.hl](examples/assembly/汇编演示.hl) - 内联汇编基础
+- [裸机编程演示.hl](examples/assembly/裸机编程演示.hl) - 外设定义、内存布局
+- [跨语言互操作示例.hl](examples/interop/跨语言互操作示例.hl) - FFI、外部函数
+- [高级特性全览.hl](examples/advanced/高级特性全览.hl) - 高级特性
+- [性能优化示例.hl](examples/performance/性能优化示例.hl) - 性能优化
+- [数组测试示例.hl](examples/comprehensive/数组测试示例.hl) - 数组操作
+
+**项目示例：**
+- [todo_app/](examples/todo_app/) - Todo应用完整项目
 
 ### 📖 完整文档
 
 - [用户指南](docs/用户开发使用文档/) - 语言基础教程
-- [标准库文档](docs/标准库文档.md) - 标准库参考
-- [包管理器指南](docs/幻语包管理器使用指南.md) - 包管理
 - [开发规范](docs/开发规范文档/) - 开发者文档
 
 ## 🛠️ 命令行工具
@@ -107,12 +135,12 @@ huan run hello.hl
 # 编译和运行
 huan build my_program.hl       # 编译
 huan run my_program.hl         # 运行
-huan check my_program.hl      # 类型检查
+huan check my_program.hl       # 类型检查
 
 # 开发工具
 huan repl                      # 交互式REPL
-huan fmt my_program.hl        # 代码格式化
-huan serve                    # LSP服务器
+huan fmt my_program.hl         # 代码格式化
+huan serve                     # LSP服务器
 
 # 包管理
 huan package init my-project   # 初始化项目
@@ -134,9 +162,9 @@ huanlang/
 │   │   └── backend/      # 代码生成后端
 │   ├── stdlib/           # 标准库
 │   ├── package/          # 包管理器
-│   ├── tools/           # 工具链
+│   ├── tools/            # 工具链
 │   └── lsp/              # LSP服务器
-├── examples/              # 示例程序（13个）
+├── examples/              # 示例程序（27个）
 ├── docs/                 # 文档
 └── dialects/             # MLIR方言
 ```
@@ -147,7 +175,7 @@ huanlang/
 |------|------|
 | 代码行数 | 50,000+ |
 | 测试用例 | 375 |
-| 示例程序 | 13 |
+| 示例程序 | 27 |
 | 核心模块 | 20+ |
 | 标准库模块 | 8 |
 | 文档页数 | 50+ |
@@ -191,6 +219,21 @@ huanlang/
 
 ---
 
+## 📞 联系方式
+
+| 方式 | 链接/信息 |
+|------|-----------|
+| 🏠 Gitee 主页 | https://gitee.com/huanxinmengmeng |
+| 🚀 GitHub 镜像 | https://github.com/huanxinmengmeng |
+| 📦 项目仓库 | https://gitee.com/huanxinmengmeng/huanlang |
+| 🌐 云湖社区 | 维护者用户ID `1925442`，交流群ID `722904639` |
+| 📧 联系邮箱 | huanxinmengmeng@126.com |
+| 📖 文档中心 | https://gitee.com/huanxinmengmeng/huanlang/tree/master/docs |
+| 🐛 问题反馈 | https://gitee.com/huanxinmengmeng/huanlang/issues |
+| 💡 功能建议 | https://gitee.com/huanxinmengmeng/huanlang/issues/new |
+
+---
+
 ## 🚀 立即开始
 
 ```bash
@@ -202,7 +245,7 @@ cd huanlang
 cargo build --release
 
 # 运行示例
-./target/release/huan run examples/hello_world.hl
+./target/release/huan run examples/basic/你好世界.hl
 ```
 
 **幻语 - 让编程更自然！** 🌟

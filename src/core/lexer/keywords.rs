@@ -44,6 +44,7 @@ const KEYWORD_TRIPLES: &[(&str, &str, &str, TokenKind)] = &[
     ("令", "ling", "let", TokenKind::Let),
     ("变量", "bianliang", "let", TokenKind::Let),
     ("定", "ding", "const", TokenKind::Const),
+    ("常量", "changliang", "const", TokenKind::Const),
     ("为", "wei", "be", TokenKind::Be),
     ("类型", "leixing", "type", TokenKind::TypeAnno),
     ("若", "ruo", "if", TokenKind::If),
@@ -51,12 +52,14 @@ const KEYWORD_TRIPLES: &[(&str, &str, &str, TokenKind)] = &[
     ("则", "ze", "then", TokenKind::Then),
     ("那么", "", "then", TokenKind::Then),  // 移除拼音映射以避免与变量名冲突
     ("否则", "fouze", "else", TokenKind::Else),
+    ("或者", "huozhe", "else", TokenKind::Else),
     ("结束", "jieshu", "end", TokenKind::End),
     ("当", "dang", "while", TokenKind::While),
-    ("循环", "xunhuan", "while", TokenKind::While),
+    ("循环", "xunhuan", "loop", TokenKind::Loop),
     ("重复", "chongfu", "repeat", TokenKind::Repeat),
     ("次", "ci", "times", TokenKind::Times),
     ("对于", "duiyu", "for", TokenKind::For),
+    ("遍历", "bianli", "for", TokenKind::For),
     ("每个", "meige", "each", TokenKind::Each),
     ("在", "zai", "in", TokenKind::In),
     ("中", "zhong", "do", TokenKind::Do),
@@ -64,11 +67,20 @@ const KEYWORD_TRIPLES: &[(&str, &str, &str, TokenKind)] = &[
     ("函数", "hanshu", "func", TokenKind::Func),
     ("函数", "hanshu", "function", TokenKind::Func),
     ("返回", "fanhui", "return", TokenKind::Return),
+    ("显示", "xianshi", "print", TokenKind::Print),
+    ("打印", "dayin", "print", TokenKind::Print),
     ("结构", "jiegou", "struct", TokenKind::Struct),
+    ("结构体", "jiegouti", "struct", TokenKind::Struct),
     ("字段", "ziduan", "field", TokenKind::Field),
     ("特征", "tezheng", "trait", TokenKind::Trait),
     ("需要", "xuyao", "requires", TokenKind::Requires),
     ("实现", "shixian", "impl", TokenKind::Impl),
+    ("接口", "jiekou", "interface", TokenKind::Interface),
+    ("抽象", "chouxiang", "abstract", TokenKind::Abstract),
+    ("类", "lei", "class", TokenKind::Class),
+    ("继承", "jicheng", "extends", TokenKind::Extends),
+    ("方法", "fangfa", "method", TokenKind::Method),
+    ("自身", "zishen", "self", TokenKind::SelfKeyword),
     ("对于类型", "duiyuleixing", "for", TokenKind::ForTy),
     ("模块", "mokuai", "module", TokenKind::Module),
     ("公开", "gongkai", "pub", TokenKind::Pub),
@@ -120,8 +132,27 @@ const KEYWORD_TRIPLES: &[(&str, &str, &str, TokenKind)] = &[
     ("外设", "waishu", "peripheral", TokenKind::Peripheral),
     ("寄存器", "jicunqi", "register", TokenKind::Register),
     ("内存", "neicun", "memory", TokenKind::Memory),
+    ("闪存", "shancun", "flash", TokenKind::Memory),
     ("布局", "buju", "layout", TokenKind::Layout),
+    ("内存布局", "neicunbuju", "memory_layout", TokenKind::Layout),
     ("段定义", "duandingyi", "segment", TokenKind::Segment),
+    
+    // 并发关键词
+    ("启动任务", "qidongrenwu", "spawn", TokenKind::Spawn),
+    ("任务组", "renwuzu", "task_group", TokenKind::TaskGroup),
+    ("通道", "tongdao", "channel", TokenKind::Channel),
+    ("互斥锁", "huchisuo", "mutex", TokenKind::Mutex),
+    ("读写锁", "duxiesuo", "rwlock", TokenKind::RwLock),
+    ("原子", "yuanzi", "atomic", TokenKind::Atomic),
+    ("屏障", "pingzhang", "barrier", TokenKind::Barrier),
+    ("一次性", "yicixing", "once", TokenKind::Once),
+    ("发送", "fasong", "send", TokenKind::Send),
+    ("同步", "tongbu", "sync", TokenKind::Sync),
+    ("异步", "yibu", "async", TokenKind::Async),
+    ("等待", "dengdai", "await", TokenKind::Await),
+    ("其中", "qizhong", "where", TokenKind::Where),
+    ("父", "fu", "super", TokenKind::Super),
+    ("静态", "jingtai", "static", TokenKind::Static),
     
     // 类型关键词
     ("整数", "zhengshu", "int", TokenKind::TypeInt),
@@ -144,6 +175,7 @@ const KEYWORD_TRIPLES: &[(&str, &str, &str, TokenKind)] = &[
     ("字典", "zidian", "map", TokenKind::TypeMap),
     ("指针", "zhizhen", "ptr", TokenKind::TypePtr),
     ("可选", "kexuan", "option", TokenKind::TypeOption),
+    ("函数类型", "hanshuleixing", "fn", TokenKind::TypeFn),
 ];
 
 impl KeywordTable {
@@ -175,19 +207,9 @@ impl KeywordTable {
         self.map.contains_key(s)
     }
 
-    /// 将 TokenKind 转换为指定风格的关键词字符串
-    pub fn to_style(&self, kind: &TokenKind, style: KeywordStyle) -> Option<&'static str> {
-        match style {
-            KeywordStyle::Chinese => self.to_chinese(kind),
-            KeywordStyle::Pinyin => self.to_pinyin(kind),
-            KeywordStyle::English => self.to_english(kind),
-        }
-    }
-
-    /// 转换为中文关键词
+    /// 将 TokenKind 转换为中文
     pub fn to_chinese(&self, kind: &TokenKind) -> Option<&'static str> {
         for &(ch, _, _, ref k) in KEYWORD_TRIPLES {
-            // 直接匹配输入的 kind 和我们的 k
             if std::mem::discriminant(kind) == std::mem::discriminant(k) {
                 return Some(ch);
             }
@@ -195,7 +217,7 @@ impl KeywordTable {
         None
     }
 
-    /// 转换为拼音关键词
+    /// 将 TokenKind 转换为拼音
     pub fn to_pinyin(&self, kind: &TokenKind) -> Option<&'static str> {
         for &(_, py, _, ref k) in KEYWORD_TRIPLES {
             if std::mem::discriminant(kind) == std::mem::discriminant(k) {
@@ -205,9 +227,8 @@ impl KeywordTable {
         None
     }
 
-    /// 转换为英文关键词
+    /// 将 TokenKind 转换为英文
     pub fn to_english(&self, kind: &TokenKind) -> Option<&'static str> {
-        // 特殊处理 Func 类型，始终返回 "func"
         if std::mem::discriminant(kind) == std::mem::discriminant(&TokenKind::Func) {
             return Some("func");
         }
@@ -218,6 +239,15 @@ impl KeywordTable {
             }
         }
         None
+    }
+
+    /// 根据指定风格转换 TokenKind
+    pub fn to_style(&self, kind: &TokenKind, style: KeywordStyle) -> Option<&'static str> {
+        match style {
+            KeywordStyle::Chinese => self.to_chinese(kind),
+            KeywordStyle::Pinyin => self.to_pinyin(kind),
+            KeywordStyle::English => self.to_english(kind),
+        }
     }
 }
 
@@ -255,6 +285,7 @@ impl KeywordStyleConverter {
                 | TokenKind::Else
                 | TokenKind::End
                 | TokenKind::While
+                | TokenKind::Loop
                 | TokenKind::Repeat
                 | TokenKind::Times
                 | TokenKind::For
@@ -264,6 +295,7 @@ impl KeywordStyleConverter {
                 | TokenKind::Begin
                 | TokenKind::Func
                 | TokenKind::Return
+                | TokenKind::Print
                 | TokenKind::Struct
                 | TokenKind::Field
                 | TokenKind::Trait
@@ -311,6 +343,21 @@ impl KeywordStyleConverter {
                 | TokenKind::Memory
                 | TokenKind::Layout
                 | TokenKind::Segment
+                | TokenKind::Spawn
+                | TokenKind::TaskGroup
+                | TokenKind::Channel
+                | TokenKind::Mutex
+                | TokenKind::RwLock
+                | TokenKind::Atomic
+                | TokenKind::Barrier
+                | TokenKind::Once
+                | TokenKind::Send
+                | TokenKind::Sync
+                | TokenKind::Async
+                | TokenKind::Await
+                | TokenKind::Where
+                | TokenKind::Super
+                | TokenKind::Static
                 | TokenKind::Extern
                 | TokenKind::Type
                 | TokenKind::Mut
@@ -334,6 +381,7 @@ impl KeywordStyleConverter {
                 | TokenKind::TypeMap
                 | TokenKind::TypePtr
                 | TokenKind::TypeOption
+                | TokenKind::TypeFn
         )
     }
     

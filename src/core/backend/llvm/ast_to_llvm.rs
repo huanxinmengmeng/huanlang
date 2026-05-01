@@ -834,6 +834,14 @@ impl AstToLlvmCodeGen {
             UnaryOp::BitNot => {
                 writeln!(&mut self.function_ir, "  {} = xor {} {}, -1", result_reg, llvm_ty, operand_reg).unwrap();
             },
+            UnaryOp::Ref => {
+                // 取地址操作 - 返回指针
+                writeln!(&mut self.function_ir, "  ; 取地址操作 &{} (暂不支持)", operand_reg).unwrap();
+            },
+            UnaryOp::Deref => {
+                // 解引用操作 - 访问指针指向的值
+                writeln!(&mut self.function_ir, "  ; 解引用操作 *{} (暂不支持)", operand_reg).unwrap();
+            },
         }
         
         Ok((result_reg, operand_ty))

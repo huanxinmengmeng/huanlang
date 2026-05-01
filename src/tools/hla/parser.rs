@@ -263,6 +263,7 @@ impl HlaParser {
 
         Ok(crate::core::ast::Function {
             public: false,
+            is_async: false,
             name,
             generics: Vec::new(),
             params,

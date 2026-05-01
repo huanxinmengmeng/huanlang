@@ -10,6 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[allow(unused_imports)]
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use super::value::Value;
@@ -25,9 +26,10 @@ pub struct FunctionDef {
     pub body: Vec<crate::core::ast::Stmt>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct EnvironmentState {
     pub variables: HashMap<String, Value>,
+    pub functions: HashMap<String, FunctionDef>,
 }
 
 impl Environment {
@@ -67,11 +69,13 @@ impl Environment {
     pub fn save_state(&self) -> EnvironmentState {
         EnvironmentState {
             variables: self.variables.clone(),
+            functions: self.functions.clone(),
         }
     }
 
     pub fn load_state(&mut self, state: EnvironmentState) {
         self.variables = state.variables;
+        self.functions = state.functions;
     }
 }
 

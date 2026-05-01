@@ -1,0 +1,42 @@
+// 幻语 - 网络请求示例
+
+导入 IO;
+
+函数 主() -> 整数 {
+    显示("=== 网络请求示例 ===")
+    显示("")
+
+    // 示例1：简单的GET请求
+    显示("1. 发送简单的GET请求：")
+    变量 result1 = 发送GET请求("https://httpbin.org/get")
+    显示("  请求结果：")
+    显示(result1)
+    显示("")
+
+    // 示例2：POST请求
+    显示("2. 发送POST请求：")
+    变量 post_data = "{\"name\": \"幻心梦梦\", \"message\": \"你好！\"}"
+    变量 result2 = 发送POST请求("https://httpbin.org/post", post_data)
+    显示("  POST请求结果：")
+    显示(result2)
+    显示("")
+
+    // 示例3：下载文件
+    显示("3. 下载文件：")
+    变量 file_name = "test_image.jpg"
+    变量 download_result = 下载文件("https://httpbin.org/image/jpeg", file_name)
+    显示("  下载结果：")
+    显示(download_result)
+    显示("")
+
+    // 清理测试文件
+    如果 文件存在(file_name) 那么 {
+        删除文件(file_name)
+        显示("  测试文件已清理")
+    }
+
+    显示("")
+    显示("网络请求示例完成！")
+
+    返回 0
+}

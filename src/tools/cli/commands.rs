@@ -202,6 +202,13 @@ pub fn execute_build(cmd: BuildCommand) -> CliResult<()> {
     let mut lexer = Lexer::new(&source);
     let (tokens, lex_errors) = lexer.tokenize();
 
+    // 调试：打印 token 20-40
+    println!("\n--- Token 20-40 ---");
+    for (i, tok) in tokens.iter().enumerate().skip(20).take(20) {
+        println!("{:3}: {:?} '{}'", i, tok.kind, tok.lexeme);
+    }
+    println!("-----------------\n");
+
     if !lex_errors.is_empty() {
         println!("词法分析错误:");
         for err in lex_errors {
@@ -394,6 +401,13 @@ pub fn execute_run(cmd: RunCommand) -> CliResult<()> {
     
     let mut lexer = Lexer::new(&source);
     let (tokens, lex_errors) = lexer.tokenize();
+
+    // 调试：打印 token 20-40
+    println!("\n--- Token 20-40 ---");
+    for (i, tok) in tokens.iter().enumerate().skip(20).take(20) {
+        println!("{:3}: {:?} '{}'", i, tok.kind, tok.lexeme);
+    }
+    println!("-----------------\n");
 
     if !lex_errors.is_empty() {
         println!("词法分析错误:");

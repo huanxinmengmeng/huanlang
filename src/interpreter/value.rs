@@ -10,10 +10,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[allow(unused_imports)]
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::sync::Arc;
+use std::sync::mpsc::Receiver;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum Value {
     Int(i64),
     Float(f64),
@@ -23,7 +26,69 @@ pub enum Value {
     Unit,
     List(Vec<Value>),
     Map(std::collections::HashMap<String, Value>),
+    Closure(Vec<String>, Vec<crate::core::ast::Stmt>),
+    Ok(Box<Value>),
+    Err(Box<Value>),
 }
+
+use std::sync::mpsc::SyncSender;
+
+#[derive(Debug)]
+pub struct ChannelSender {
+    sender: SyncSender<Value>,
+}
+
+impl ChannelSender {
+    pub fn new(sender: SyncSender<Value>) -> Self {
+        ChannelSender { sender }
+    }
+    
+    pub fn send(&self, value: Value) -> Result<(), String> {
+        self.sender.send(value).map_err(|e| e.to_string())
+    }
+}
+
+#[derive(Debug)]
+pub struct ChannelReceiver {
+    receiver: Receiver<Value>,
+}
+
+impl ChannelReceiver {
+    pub fn new(receiver: Receiver<Value>) -> Self {
+        ChannelReceiver { receiver }
+    }
+    
+    pub fn recv(&self) -> Result<Value, String> {
+        self.receiver.recv().map_err(|e| e.to_string())
+    }
+    
+    pub fn try_recv(&self) -> Result<Value, String> {
+        self.receiver.try_recv().map_err(|e| e.to_string())
+    }
+}
+
+pub struct ChannelData {
+    sender: SyncSender<Value>,
+    receiver: Receiver<Value>,
+}
+
+impl ChannelData {
+    pub fn new(capacity: usize) -> Self {
+        let (sender, receiver) = std::sync::mpsc::sync_channel(capacity);
+        ChannelData { sender, receiver }
+    }
+    
+    pub fn send(&self, value: Value) -> Result<(), String> {
+        self.sender.send(value).map_err(|e| e.to_string())
+    }
+    
+    pub fn recv(&self) -> Result<Value, String> {
+        self.receiver.recv().map_err(|e| e.to_string())
+    }
+}
+
+pub type SharedChannelSender = Arc<ChannelSender>;
+pub type SharedChannelReceiver = Arc<ChannelReceiver>;
 
 impl Value {
     pub fn to_string(&self) -> String {
@@ -45,6 +110,11 @@ impl Value {
                     .collect();
                 format!("{{{}}}", items.join(", "))
             }
+            Value::Closure(params, _) => {
+                format!("||({})", params.join(", "))
+            }
+            Value::Ok(v) => format!("成功({})", v.to_string()),
+            Value::Err(v) => format!("错误({})", v.to_string()),
         }
     }
 
@@ -80,6 +150,9 @@ impl Value {
             Value::Unit => "单元",
             Value::List(_) => "列表",
             Value::Map(_) => "映射",
+            Value::Closure(_, _) => "闭包",
+            Value::Ok(_) => "成功",
+            Value::Err(_) => "错误",
         }
     }
 }
@@ -101,6 +174,9 @@ impl PartialEq for Value {
             (Value::Unit, Value::Unit) => true,
             (Value::List(a), Value::List(b)) => a == b,
             (Value::Map(a), Value::Map(b)) => a == b,
+            (Value::Closure(p1, b1), Value::Closure(p2, b2)) => p1 == p2 && b1 == b2,
+            (Value::Ok(a), Value::Ok(b)) => a == b,
+            (Value::Err(a), Value::Err(b)) => a == b,
             _ => false,
         }
     }

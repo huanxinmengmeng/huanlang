@@ -45,18 +45,22 @@ impl Lexer {
         }
     }
 
+    #[inline]
     fn current_position(&self) -> SourcePosition {
         SourcePosition::new(self.pos, self.line, self.column)
     }
 
+    #[inline]
     fn current_char(&self) -> Option<char> {
         self.chars.get(self.pos).copied()
     }
 
+    #[inline]
     fn peek_char(&self) -> Option<char> {
         self.chars.get(self.pos + 1).copied()
     }
 
+    #[inline]
     fn advance(&mut self) -> Option<char> {
         if let Some(ch) = self.current_char() {
             self.pos += 1;
@@ -72,6 +76,7 @@ impl Lexer {
         }
     }
 
+    #[inline]
     fn is_eof(&self) -> bool {
         self.pos >= self.chars.len()
     }
@@ -386,27 +391,87 @@ impl Lexer {
     }
 
     fn lex_identifier_or_keyword(&mut self, start: SourcePosition) -> Result<Token, LexError> {
-        let mut lexeme = String::new();
+        // 先看看第一个字符是不是 CJK（中文）字符
+        let first_char = self.current_char().unwrap();
+        if is_cjk_char(first_char) {
+            // 对于 CJK 字符序列，使用最长关键词匹配
+            // 先收集所有可能的标识符字符
+            let mut all_chars = Vec::new();
+            let mut saved_pos = self.pos;
+            let saved_line = self.line;
+            let saved_column = self.column;
 
-        while let Some(ch) = self.current_char() {
-            if is_identifier_char(ch) {
-                lexeme.push(ch);
-                self.advance();
-            } else {
-                break;
+            while let Some(ch) = self.current_char() {
+                if is_identifier_char(ch) {
+                    all_chars.push(ch);
+                    self.advance();
+                } else {
+                    break;
+                }
             }
-        }
 
-        let end = self.current_position();
-        let span = SourceSpan::new(start, end);
+            // 现在尝试从长到短匹配关键词
+            for len in (1..=all_chars.len()).rev() {
+                let candidate: String = all_chars[0..len].iter().collect();
+                if let Some(kind) = self.keyword_table.get(candidate.as_str()) {
+                    let is_valid = if len == all_chars.len() {
+                        true
+                    } else if len == 1 {
+                        // 单字符关键词，只在后面跟着非标识符字符时匹配
+                        !is_identifier_char(all_chars[len])
+                    } else {
+                        // 多字符关键词，只要 len+1 不是关键词就匹配
+                        let longer_candidate: String = all_chars[0..len+1].iter().collect();
+                        self.keyword_table.get(longer_candidate.as_str()).is_none()
+                    };
+                    if is_valid {
+                        // 匹配成功！回退到 len 个字符之后
+                        self.pos = saved_pos;
+                        self.line = saved_line;
+                        self.column = saved_column;
+                        let mut lexeme = String::new();
+                        for _ in 0..len {
+                            if let Some(ch) = self.current_char() {
+                                lexeme.push(ch);
+                                self.advance();
+                            }
+                        }
+                        let end = self.current_position();
+                        let span = SourceSpan::new(start, end);
+                        return Ok(Token::new(kind, span, lexeme));
+                    }
+                }
+            }
 
-        let kind = if let Some(kind) = self.keyword_table.get(lexeme.as_str()) {
-            kind
+            // 如果没有匹配到任何关键词，就把所有字符作为标识符
+            let lexeme: String = all_chars.into_iter().collect();
+            let end = self.current_position();
+            let span = SourceSpan::new(start, end);
+
+            return Ok(Token::new(TokenKind::Ident(lexeme.clone()), span, lexeme));
         } else {
-            TokenKind::Ident(lexeme.clone())
-        };
+            // 对于非 CJK 字符（英文、拼音），使用原来的方法
+            let mut lexeme = String::new();
+            while let Some(ch) = self.current_char() {
+                if is_identifier_char(ch) {
+                    lexeme.push(ch);
+                    self.advance();
+                } else {
+                    break;
+                }
+            }
 
-        Ok(Token::new(kind, span, lexeme))
+            let end = self.current_position();
+            let span = SourceSpan::new(start, end);
+
+            let kind = if let Some(kind) = self.keyword_table.get(lexeme.as_str()) {
+                kind
+            } else {
+                TokenKind::Ident(lexeme.clone())
+            };
+
+            return Ok(Token::new(kind, span, lexeme));
+        }
     }
 
     fn lex_symbol(&mut self, start: SourcePosition) -> Result<Token, LexError> {
@@ -577,6 +642,12 @@ impl Lexer {
                 } else {
                     TokenKind::BitXor
                 }
+            }
+            '?' => {
+                TokenKind::QuestionMark
+            }
+            '@' => {
+                TokenKind::At
             }
             _ => return Err(LexError::UnexpectedChar { ch, pos: start }),
         };
